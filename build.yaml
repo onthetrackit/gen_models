@@ -1,14 +1,21 @@
 targets:
   $default:
     builders:
-      gen_models|genBuilder:
+      gen_models:genBuilder:
         enabled: true
+        options:
+          build_extensions:
+            '.dart': '.g1.dart'
 
 builders:
   genBuilder:
     import: "package:gen_models/builder.dart"
     builder_factories: ["genBuilder"]
-    build_extensions: {".dart": ["g.dart"]}
+    build_extensions:
+      ".dart": [".gen.dart"]
     auto_apply: dependents
     build_to: source
     runs_before: []
+    defaults:
+      options:
+        output_dir: "lib/gen"
