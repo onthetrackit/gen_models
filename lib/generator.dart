@@ -1,7 +1,10 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
 import 'package:gen_models/annotations.dart';
+import 'package:gen_models/app_values.dart';
+import 'package:gen_models/string_utils.dart';
 import 'package:source_gen/source_gen.dart';
+import 'package:collection/collection.dart';
 
 import 'builder.dart';
 
@@ -13,92 +16,110 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   GeneratedBuilderFactory? generateBuilderFactory;
   List objs = [];
   String? path = "";
+  final modelPath = '/models';
 
   @override
   Future<String?> generateForAnnotatedElement(
       Element element, ConstantReader annotation, BuildStep buildStep) async {
-    // final libUri = annotation.objectValue.type?.element?.librarySource?.uri.toString();
-    // if (libUri == null || !libUri.contains('package:gen_models/')) {
-    //   return 'ffffff'; // bỏ qua
-    // }
-    final buffer = StringBuffer('//asfd2452354++++++');
-    final imports = _cloneImports(element.library!);
-    buffer.writeln(imports);
-    final constructors = _cloneConstructors(element.library!);
-    buffer.writeln(constructors);
+    final buffer = StringBuffer();
+    // path = _getPath(element);
+    final importPath = 'lib/data/models/';
+    List<String> imports = _getImports(element.library!);
+    imports.add(_getImportForElement(element));
     generateBuilderFactory = GeneratedBuilderFactory(objects: [], path: '');
-    buffer.writeln(_getBody(element.library!, annotation));
-    buffer.writeln('builderHashCode ${builderHashCode}');
-    buffer.writeln('$path');
+    final classes = _getBody(element.library!, annotation);
+    List<String> bodies = [];
+    classes.forEach(
+      (element) {
+        imports.addAll(element.imports);
+        bodies.add(element.body);
+      },
+    );
+    imports = imports.toSet().toList();
+    imports.sort();
+    buffer.writeln(imports.join('\n'));
+    buffer.writeln(bodies.join('\n\n'));
     generateBuilderFactory?.objects = objs;
     generateBuilderFactory?.path = path ?? '';
     onDetectedClassPaths?.call(data: generateBuilderFactory!);
     return buffer.toString();
-    return '//asfd2452354++++++';
   }
 
-  String _getBody(LibraryElement library, ConstantReader annotation) {
+  List<ClassResult> _getBody(
+      LibraryElement library, ConstantReader annotation) {
     final reader = LibraryReader(library);
+    final resultStrings = StringBuffer();
+    List<ClassResult> results = [];
+    reader.classes.forEach((cls) {
+      objs.add(cls);
+      results.add(_getClassText(cls));
+    });
+    return results;
+  }
 
-    final resultStrings = <String>[];
-    final setName = Set<String>();
-    final target = annotation.read('target');
-    final targetType = target.typeValue;
-    targetType.element?.children.forEach(
-      (element) {
-        if (element is FieldElement) {
-          // resultStrings
-          //     .add('fff:${element.name}: ${element.type.getDisplayString()}: ');
+  ClassResult _getClassText(ClassElement cls) {
+    StringBuffer sb = StringBuffer();
+    final dtoClass = StringUtils.getDTOClass(cls.name);
+    final mapperClass = StringUtils.getMapperClass(cls.name);
+    final dtoObject = 'obj';
+    final fromDTO = StringUtils.methodConvertName;
+    final newObj = 'newObj';
+    final domainClass = '${cls.name}';
+    sb.writeln('class ${mapperClass}{');
+    sb.writeln('  static ${domainClass} $fromDTO($dtoClass? ${dtoObject}){');
+    sb.writeln('  ${domainClass} ${newObj} = $domainClass();');
+    List<String> imports = [];
+    cls.fields.forEach(
+      (field) {
+        if (!field.isSynthetic) {
+          final type = field.type.toString().replaceAll(r'?', '');
+          if (AppValues.nativeTypes.contains(type) ||
+              (field.type.element != null &&
+                  !isGenModelsClass(field.type.element!))) {
+            sb.writeln(
+                '   ${newObj}.${field.name} = ${dtoObject}.${field.name};');
+          } else {
+            sb.writeln(
+                '    ${newObj}.${field.name} = ${_getClassNameFromType(field.type.toString())}Mapper.$fromDTO(${dtoObject}.${field.name});');
+            imports.add(_getImportForElement(field.type.element!).replaceAll('.dart', '.mapper.dart'));
+          }
         }
-        // resultStrings
-        //     .add('fff:${element.toString()}:');
       },
     );
-    print('ffffffff== ${reader.classes.length}');
-    path = _getPath(targetType.element);
-    resultStrings.add(_getPath(targetType.element));
-    resultStrings.add(_getPath(targetType.element));
-    reader.classes.forEach((e) {
-      objs.add(e);
+    sb.writeln('    return newObj;');
+    sb.writeln('  }\n}');
+    return ClassResult(body: sb.toString(), imports: imports);
+  }
 
-      // onDetectedClassPaths?.call();
-      // e.metadata.forEach((element) {
-      //   final metaReader=LibraryReader(element.librarySource.);
-      //   metaReader.allElements.forEach((element) {
-      //     resultStrings.add(element.toString());
-      //   },);
-      // },);
-      for (final field in e.fields) {
-        // e.children.forEach((element) {
-        //   if(element is FieldElement){
-        // resultStrings.add('@JsonKey(${field.name})')
-        // resultStrings.add("${element.getDisplayString()}");
-        //   }
-        // },);
-      }
-    });
-    return resultStrings.join('\n');
+  String _getImportForElement(Element element) {
+    return "import '${_getPath(element)}';";
+  }
+
+  String _getClassNameFromType(String? type) {
+    if (type?.isNotEmpty == true) {
+      return type!.replaceAll('?', '');
+    }
+    return type ?? '';
+  }
+
+  bool isGenModelsClass(Element element) {
+    return element.metadata.firstWhereOrNull(
+            (element) => element.toString().contains('@GenModels')) !=
+        null;
   }
 
 // Hàm hỗ trợ clone imports
-  String _cloneImports(LibraryElement library) {
+  List<String> _getImports(LibraryElement library) {
     final reader = LibraryReader(library);
-    final importStrings = <String>[];
-
+    final List<String> sb = [];
     for (final import in reader.allElements.where(
       (element) => element is LibraryImportElement,
     )) {
       if (!import.isSynthetic) {
-        importStrings.add(_convertImport(import.getDisplayString()));
+        sb.add(_convertImport(import.getDisplayString(withNullability: true)));
       }
     }
-    // for (final import in reader.classes){
-    //   import.constructors.forEach((element) {
-    //     importStrings.add(getConstructor(element));
-    //   },);
-    // }
-    PropertyAccessorElement a;
-    return importStrings.join('\n');
+    return sb;
   }
 
   String _getPath(Element? element) {
@@ -122,128 +143,19 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     return info.join("\n");
   }
 
-  getConstructor(ConstructorElement? constructor) {
-    if (constructor == null) return '';
-    String params = "";
-    if (constructor.augmentation != null) {
-      params = getConstructor(constructor.augmentation as ConstructorElement);
-    }
-
-    final info = [
-      '_________________________________ ${constructor == constructor.declaration}',
-      'children=${constructor.children?.map(
-            (e) => e.getDisplayString(),
-          )?.join('\n')?.toString()}',
-      'context=${constructor.context?.toString()}',
-      'context=${constructor.location}',
-      'augmentation=${constructor.augmentation?.toString()}',
-      'typeParameters=${constructor.typeParameters.length?.toString()}',
-      'parameters=${constructor.parameters.length?.toString()}',
-      'augmentationTarget=${constructor.augmentationTarget?.toString()}',
-      'declaration=${constructor.declaration?.toString()}',
-      'displayName=${constructor.displayName?.toString()}',
-      'enclosingElement=${constructor.enclosingElement?.toString()}',
-      'isConst=${constructor.isConst?.toString()}',
-      'isDefaultConstructor=${constructor.isDefaultConstructor?.toString()}',
-      'isFactory=${constructor.isFactory?.toString()}',
-      'isGenerative=${constructor.isGenerative?.toString()}',
-      'name=${constructor.name?.toString()}',
-      'nameEnd=${constructor.nameEnd?.toString()}',
-      'periodOffset=${constructor.periodOffset?.toString()}',
-      'redirectedConstructor=${constructor.redirectedConstructor?.toString()}',
-      'returnType=${constructor.returnType?.toString()}',
-      'superConstructor=${constructor.superConstructor?.toString()}'
-          '++++++++++++'
-    ];
-    info.add(params);
-    info.add(
-        'redirectedConstructor=${getConstructor(constructor.redirectedConstructor)}');
-    info.add(
-        'superConstructor=${getConstructor(constructor.superConstructor)}');
-    info.add(
-        'augmentationTarget=${getConstructor(constructor.augmentationTarget)}');
-    return info.join('\n_________');
-  }
-
-  String _cloneConstructors(LibraryElement library) {
-    final reader = LibraryReader(library);
-    final importStrings = <String>[];
-    // reader.allElements.forEach((e) {
-    //   importStrings
-    //       .add(e.getDisplayString());
-    //   importStrings.add(
-    //       e.runtimeType.toString());
-    // });
-    for (final item in reader.allElements.where(
-      (element) => element is ClassElement,
-    )) {
-      ClassElement e = item as ClassElement;
-      e.constructors.forEach(
-        (element) {
-          importStrings.add(getConstructor(element as ConstructorElement));
-        },
-      );
-    }
-    return importStrings.join('\n');
-  }
-
   String _convertImport(String text) {
     final splits = text.split(" ");
     final packages = splits[2].substring(1).split("/");
+    //import source /gen_del3/lib/abc/test.dart
     String result =
-        "${splits[0]} 'package:${packages.first}/${packages.last}';";
+        "${splits[0]} 'package:${packages.first}/${packages.sublist(2).join('/')}';";
     return result;
   }
 }
 
-String getElementInfo(Element element) {
-  return '''
-children: ${element.children}
-context: ${element.context}
-declaration: ${element.declaration}
-displayName: ${element.displayName}
-documentationComment: ${element.documentationComment}
-enclosingElement: ${element.enclosingElement}
-hasAlwaysThrows: ${element.hasAlwaysThrows}
-hasDeprecated: ${element.hasDeprecated}
-hasDoNotStore: ${element.hasDoNotStore}
-hasDoNotSubmit: ${element.hasDoNotSubmit}
-hasFactory: ${element.hasFactory}
-hasImmutable: ${element.hasImmutable}
-hasInternal: ${element.hasInternal}
-hasIsTest: ${element.hasIsTest}
-hasIsTestGroup: ${element.hasIsTestGroup}
-hasJS: ${element.hasJS}
-hasLiteral: ${element.hasLiteral}
-hasMustBeConst: ${element.hasMustBeConst}
-hasMustBeOverridden: ${element.hasMustBeOverridden}
-hasMustCallSuper: ${element.hasMustCallSuper}
-hasNonVirtual: ${element.hasNonVirtual}
-hasOptionalTypeArgs: ${element.hasOptionalTypeArgs}
-hasOverride: ${element.hasOverride}
-hasProtected: ${element.hasProtected}
-hasRedeclare: ${element.hasRedeclare}
-hasReopen: ${element.hasReopen}
-hasRequired: ${element.hasRequired}
-hasSealed: ${element.hasSealed}
-hasUseResult: ${element.hasUseResult}
-hasVisibleForOverriding: ${element.hasVisibleForOverriding}
-hasVisibleForTemplate: ${element.hasVisibleForTemplate}
-hasVisibleForTesting: ${element.hasVisibleForTesting}
-hasVisibleOutsideTemplate: ${element.hasVisibleOutsideTemplate}
-id: ${element.id}
-isPrivate: ${element.isPrivate}
-isPublic: ${element.isPublic}
-isSynthetic: ${element.isSynthetic}
-kind: ${element.kind}
-library: ${element.library}
-location: ${element.location}
-metadata: ${element.metadata}
-name: ${element.name}
-nameLength: ${element.nameLength}
-nameOffset: ${element.nameOffset}
-nonSynthetic: ${element.nonSynthetic}
-session: ${element.session}
-sinceSdkVersion: ${element.sinceSdkVersion}
-''';
+class ClassResult {
+  List<String> imports;
+  String body;
+
+  ClassResult({this.imports = const [], this.body = ''});
 }

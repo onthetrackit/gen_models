@@ -28,7 +28,6 @@ class _IndexingBuilder implements Builder {
 
   @override
   Future<void> build(BuildStep buildStep) async {
-    print('cha');
     File indexFile = File('lib/mapper_generated.mapper.dart');
 
     if (indexFile.existsSync() && !isDeleted) {
@@ -108,7 +107,6 @@ class GenModelsBuilder extends LibraryBuilder {
   @override
   Future<void> build(BuildStep buildStep) async {
     count++;
-    print('da vao: $count');
     _imports.clear();
     _funcs.clear();
     generateBuilderFactory = GeneratedBuilderFactory();
@@ -139,8 +137,8 @@ class GenModelsBuilder extends LibraryBuilder {
       startFile = arrays[0];
       endFile = arrays[1];
     }
-    print('_imports.join:${_imports.join('\n')}');
-    print('_funcs.join:${_funcs.join('\n')}');
+    // print('_imports.join:${_imports.join('\n')}');
+    // print('_funcs.join:${_funcs.join('\n')}');
     startFile = '''${_imports.join('\n')}${startFile}''';
     endFile = '''${_funcs.join('\n')}${endFile}''';
     content = '''
@@ -168,9 +166,9 @@ class GenModelsBuilder extends LibraryBuilder {
       required dynamic obj,
       String? prefix}) {
     String className = obj.runtimeType.toString();
-    print('file.path: ${file.path}');
-    print(
-        'func.path: ${'MapperData(type: "${obj.runtimeType.toString()}", func: ${prefix}.${className}.fromDTO)'}');
+    // print('file.path: ${file.path}');
+    // print(
+    //     'func.path: ${'MapperData(type: "${obj.runtimeType.toString()}", func: ${prefix}.${className}.fromDTO)'}');
     _imports.add(
       '//import "${file.path}" as ${prefix};',
     );
