@@ -2,7 +2,7 @@ import 'package:meta/meta.dart';
 
 @immutable
 class GenModels {
-  final Type target;
+  final Type? target;
 
-  const GenModels({required this.target});
+  const GenModels({ this.target});
 }
