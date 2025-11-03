@@ -36,7 +36,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
       },
     );
     imports = imports.toSet().toList();
-    imports.sort();
     buffer.writeln(imports.join('\n'));
     buffer.writeln(bodies.join('\n\n'));
     generateBuilderFactory?.objects = objs;
@@ -80,14 +79,13 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
                 '   ${newObj}.${field.name} = ${dtoObject}.${field.name};');
           } else {
             sb.writeln(
-                '    ${newObj}.${field.name} = ${_getClassNameFromType(field.type.toString())}Mapper.$fromDTO(${dtoObject}.${field.name});');
+                '    ${newObj}.${field.name} = ${_getClassNameFromType(field.type.toString())}Mapper.$fromDTO(${field.name});');
             imports.add(_getImportForElement(field.type.element!).replaceAll('.dart', '.mapper.dart'));
           }
         }
       },
     );
-    sb.writeln('    return newObj;');
-    sb.writeln('  }\n}');
+    sb.writeln('  )\n}');
     return ClassResult(body: sb.toString(), imports: imports);
   }
 
@@ -97,7 +95,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
 
   String _getClassNameFromType(String? type) {
     if (type?.isNotEmpty == true) {
-      return type!.replaceAll('?', '');
+      type!.replaceAll('\?', '');
     }
     return type ?? '';
   }
