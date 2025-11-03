@@ -130,18 +130,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
         '';
   }
 
-  String getPropertyAccessorElement(PropertyAccessorElement element) {
-    List<String> info = [
-      "isGetter:  ${element.isGetter}",
-      "isSetter:  ${element.isSetter}",
-      "isPrivate:  ${element.isPrivate}",
-      "isPublic:  ${element.isPublic}",
-      "isSynthetic:  ${element.isSynthetic}",
-      "isExternal:  ${element.isExternal}",
-    ];
-    return info.join("\n");
-  }
-
   String _convertImport(String text) {
     final splits = text.split(" ");
     final packages = splits[2].substring(1).split("/");
