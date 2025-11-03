@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:build/build.dart';
 import 'package:glob/glob.dart';
 
@@ -18,7 +19,7 @@ class AggregateBuilder implements Builder {
   Future<void> build(BuildStep buildStep) async {
     // Tìm tất cả file .dart trong lib/models/ (hoặc bất kỳ pattern nào)
     print('cai gi the');
-    final models = Glob('*.mapper.dart');
+    final models = Glob('build/mapper_index.tmp');
 
     final buffer = StringBuffer();
     buffer.writeln('// AUTO-GENERATED FILE - DO NOT EDIT');
@@ -34,7 +35,8 @@ class AggregateBuilder implements Builder {
         buffer.writeln('  $content,');
         buffer.writeln('];');
     }
-
+    final indexFile = File('build/mapper_index.tmp');
+    buffer.writeln(indexFile.readAsString());
     buffer.writeln();
     buffer.writeln('====___List<Type> get allModelTypes => _allModels;');
 

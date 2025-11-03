@@ -21,18 +21,10 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     // if (libUri == null || !libUri.contains('package:gen_models/')) {
     //   return 'ffffff'; // bỏ qua
     // }
-
-
-
-
     final buffer = StringBuffer('//asfd2452354++++++');
-    return buffer.toString();
-    final imports =
-        _cloneImports(element.library!);
+    final imports = _cloneImports(element.library!);
     buffer.writeln(imports);
-    final constructors =
-        _cloneConstructors(
-            element.library!);
+    final constructors = _cloneConstructors(element.library!);
     buffer.writeln(constructors);
     generateBuilderFactory = GeneratedBuilderFactory(objects: [], path: '');
     buffer.writeln(_getBody(element.library!, annotation));
@@ -40,8 +32,9 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     buffer.writeln('$path');
     generateBuilderFactory?.objects = objs;
     generateBuilderFactory?.path = path ?? '';
-    onDetectedClassPaths?.call(data:generateBuilderFactory!);
+    onDetectedClassPaths?.call(data: generateBuilderFactory!);
     return buffer.toString();
+    return '//asfd2452354++++++';
   }
 
   String _getBody(LibraryElement library, ConstantReader annotation) {
@@ -62,6 +55,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
       },
     );
     print('ffffffff== ${reader.classes.length}');
+    path = _getPath(targetType.element);
     resultStrings.add(_getPath(targetType.element));
     resultStrings.add(_getPath(targetType.element));
     reader.classes.forEach((e) {

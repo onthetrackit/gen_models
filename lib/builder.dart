@@ -1,38 +1,58 @@
+import 'dart:io';
+import 'dart:math';
+
 import 'package:build/build.dart';
 import 'package:source_gen/source_gen.dart';
 
 import 'generator.dart';
 
-Builder genBuilder(BuilderOptions options) =>
-    GenModelsBuilder(GenModelsGenerator(), generatedExtension: '.mapper.dart');
+Builder genBuilder(BuilderOptions options) {
+  final libBuilder = GenModelsBuilder(GenModelsGenerator(),
+      generatedExtension: '.mapper.dart');
 
+  // Trả builder "bọc"
+  return _IndexingBuilder(libBuilder);
+}
 
+class _IndexingBuilder implements Builder {
+  final GenModelsBuilder _inner;
+  bool isDeleted = false;
+  Set<String> allFiles = Set();
+  final String fileSeparator = '__start file__';
+  Map<String, String> allFileContents = {};
 
+  _IndexingBuilder(this._inner);
 
+  @override
+  Map<String, List<String>> get buildExtensions => _inner.buildExtensions;
 
+  @override
+  Future<void> build(BuildStep buildStep) async {
+    print('cha');
+    File indexFile = File('lib/mapper_generated.mapper.dart');
 
+    if (indexFile.existsSync() && !isDeleted) {
+      final content = indexFile.readAsStringSync().split(fileSeparator);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      indexFile.deleteSync();
+    }
+    final resutl = await _inner.getBuildOutput(buildStep);
+    if (resutl.imports?.isEmpty == true) return;
+    if (indexFile.existsSync() && !isDeleted) {
+      indexFile.deleteSync();
+    }
+    indexFile.createSync(recursive: true);
+    String content = '''
+    //__start file__
+    //${resutl.path}
+    ${resutl.imports ?? ''}\n${resutl.funcs ?? ''}\n
+    ''';
+    if (resutl.imports?.isNotEmpty == true) {
+      indexFile.writeAsStringSync(content, mode: FileMode.append);
+    }
+    isDeleted = true;
+  }
+}
 
 class GenModelsBuilder extends LibraryBuilder {
   int _importCount = 0;
@@ -79,14 +99,23 @@ class GenModelsBuilder extends LibraryBuilder {
 
   int count = 0;
 
+  Future<GenModelsBuilderOutput> getBuildOutput(BuildStep buildStep) async {
+    await build(buildStep);
+    return GenModelsBuilderOutput(
+        imports: _imports.join('\n'), funcs: _funcs.join('\n'),path: generateBuilderFactory.path);
+  }
+
   @override
   Future<void> build(BuildStep buildStep) async {
+    count++;
+    print('da vao: $count');
     _imports.clear();
     _funcs.clear();
     generateBuilderFactory = GeneratedBuilderFactory();
     generator.onDetectedClassPaths = _onDetectedClassPaths;
     generator.builderHashCode = hashCode.toString();
     final result = await super.build(buildStep);
+    _generateContent();
     // await _createdMapperFile(buildStep);
     return result;
   }
@@ -140,12 +169,13 @@ class GenModelsBuilder extends LibraryBuilder {
       String? prefix}) {
     String className = obj.runtimeType.toString();
     print('file.path: ${file.path}');
-    print('func.path: ${'MapperData(type: "${obj.runtimeType.toString()}", func: ${prefix}.${className}.fromDTO)'}');
+    print(
+        'func.path: ${'MapperData(type: "${obj.runtimeType.toString()}", func: ${prefix}.${className}.fromDTO)'}');
     _imports.add(
-      'import "${file.path}", as ${prefix};',
+      '//import "${file.path}" as ${prefix};',
     );
     _funcs.add(
-      'MapperData(type: "${obj.runtimeType.toString()}", func: ${prefix}.${className}.fromDTO)',
+      '//MapperData(type: "${obj.runtimeType.toString()}", func: ${prefix}.${className}.fromDTO)',
     );
   }
 
@@ -169,4 +199,12 @@ class GeneratedBuilderFactory {
   String? prefix;
 
   GeneratedBuilderFactory({this.objects, this.path});
+}
+
+class GenModelsBuilderOutput {
+  String? imports;
+  String? funcs;
+  String? path;
+
+  GenModelsBuilderOutput({this.imports, this.funcs, this.path});
 }

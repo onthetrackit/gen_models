@@ -6,11 +6,11 @@ targets:
         options:
           build_extensions:
             '.dart': '.g1.dart'
-      gen_models:mergeBuilder:
-        enabled: true
-        options:
-          build_extensions:
-            '.dart': '.g1.dart'
+#      gen_models:mergeBuilder:
+#        enabled: true
+#        options:
+#          build_extensions:
+#            '.dart': '.g1.dart'
 
 builders:
   genBuilder:
@@ -24,15 +24,15 @@ builders:
     defaults:
       options:
         output_dir: "lib/gen"
-  mergeBuilder:
-    import: "package:gen_models/merge_files.dart"
-    builder_factories: ["mergeBuilder"]
-    build_extensions:
-      ".dart": [".gen.dart"]
-    auto_apply: dependents
-    build_to: source
-    required_inputs:
-      - "**/*.mapper.dart"
-    defaults:
-      options:
-        output_dir: "lib/gen"
+#  mergeBuilder:
+#    import: "package:gen_models/merge_files.dart"
+#    builder_factories: ["mergeBuilder"]
+#    build_extensions:
+#      ".dart": [".gen.dart"]
+#    auto_apply: dependents
+#    build_to: source
+#    required_inputs:
+#      - "**/*.mapper.dart"
+#    defaults:
+#      options:
+#        output_dir: "lib/gen"
