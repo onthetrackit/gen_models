@@ -36,6 +36,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
       },
     );
     imports = imports.toSet().toList();
+    imports.sort();
     buffer.writeln(imports.join('\n'));
     buffer.writeln(bodies.join('\n\n'));
     generateBuilderFactory?.objects = objs;
