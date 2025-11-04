@@ -2,13 +2,14 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:build/build.dart';
+import 'package:gen_models/build_option_keys.dart';
 import 'package:source_gen/source_gen.dart';
 
 import 'generator.dart';
 
 Builder genBuilder(BuilderOptions options) {
   final libBuilder = GenModelsBuilder(GenModelsGenerator(),
-      generatedExtension: '.mapper.dart');
+      generatedExtension: '.mapper.dart',options: options);
 
   // Trả builder "bọc"
   return IndexingBuilder(libBuilder);
@@ -64,6 +65,9 @@ class GenModelsBuilder extends LibraryBuilder {
   late GeneratedBuilderFactory generateBuilderFactory;
   final filePath = 'build/fake.mapper.dart';
   final split = '//=============';
+  BuilderOptions? options;
+  String? dataDir;
+  String? domainDir;
 
   GenModelsBuilder(
     Generator generator, {
@@ -82,6 +86,9 @@ class GenModelsBuilder extends LibraryBuilder {
           allowSyntaxErrors: allowSyntaxErrors,
           options: options,
         ) {
+    this.options = options;
+    dataDir ??= options?.config[BuildOptionKeys.dataDir];
+    domainDir ??= options?.config[BuildOptionKeys.domainDir];
     this.generator = generator as GenModelsGenerator;
   }
 
@@ -101,11 +108,15 @@ class GenModelsBuilder extends LibraryBuilder {
   Future<GenModelsBuilderOutput> getBuildOutput(BuildStep buildStep) async {
     await build(buildStep);
     return GenModelsBuilderOutput(
-        imports: _imports.join('\n'), funcs: _funcs.join('\n'),path: generateBuilderFactory.path);
+        imports: _imports.join('\n'),
+        funcs: _funcs.join('\n'),
+        path: generateBuilderFactory.path);
   }
 
   @override
   Future<void> build(BuildStep buildStep) async {
+    print(
+        'domainDir:${domainDir} ==${options == null}  == ${options?.config.length}');
     count++;
     _imports.clear();
     _funcs.clear();
