@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:build/build.dart';
-import 'package:gen_models/build_option_keys.dart';
+import 'package:gen_models/constants/build_option_keys.dart';
 import 'package:source_gen/source_gen.dart';
 
 import 'generator.dart';

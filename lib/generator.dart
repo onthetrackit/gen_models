@@ -2,7 +2,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:build/build.dart';
 import 'package:gen_models/annotations.dart';
-import 'package:gen_models/app_values.dart';
+import 'package:gen_models/constants/app_values.dart';
 import 'package:gen_models/string_utils.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:collection/collection.dart';
