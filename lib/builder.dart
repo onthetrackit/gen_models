@@ -11,17 +11,17 @@ Builder genBuilder(BuilderOptions options) {
       generatedExtension: '.mapper.dart');
 
   // Trả builder "bọc"
-  return _IndexingBuilder(libBuilder);
+  return IndexingBuilder(libBuilder);
 }
 
-class _IndexingBuilder implements Builder {
+class IndexingBuilder implements Builder {
   final GenModelsBuilder _inner;
   bool isDeleted = false;
   Set<String> allFiles = Set();
   final String fileSeparator = '__start file__';
   Map<String, String> allFileContents = {};
 
-  _IndexingBuilder(this._inner);
+  IndexingBuilder(this._inner);
 
   @override
   Map<String, List<String>> get buildExtensions => _inner.buildExtensions;

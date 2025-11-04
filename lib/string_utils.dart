@@ -1,5 +1,7 @@
 class StringUtils {
   static const methodConvertName = 'fromDTO';
+  static const dtoObject = 'obj';
+  static const newObj = 'newObj';
 
   static String toCamelCase(String? text) {
     if (text?.isNotEmpty == true) {
@@ -11,6 +13,7 @@ class StringUtils {
   static String getMapperClass(String className) {
     return '${className}Mapper';
   }
+
   static String getDTOClass(String className) {
     return '${className}DTO';
   }
