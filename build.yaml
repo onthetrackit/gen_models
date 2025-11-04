@@ -14,7 +14,7 @@ targets:
 
 builders:
   genBuilder:
-    import: "package:gen_models/builder.dart"
+    import: "package:gen_models/builder/builder.dart"
     builder_factories: ["genBuilder"]
     build_extensions:
       ".dart": [".gen.dart"]

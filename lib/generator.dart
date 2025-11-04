@@ -7,7 +7,8 @@ import 'package:gen_models/string_utils.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:collection/collection.dart';
 
-import 'builder.dart';
+import 'builder/builder.dart';
+import 'builder/gen_models_builder.dart';
 import 'constants/build_option_keys.dart';
 
 typedef GetClassPaths = void Function({required GeneratedBuilderFactory data});
@@ -37,6 +38,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
       Element element, ConstantReader annotation, BuildStep buildStep) async {
     final buffer = StringBuffer();
     path = _getPath(element);
+    print('path==${path}');
     List<String> imports = _getImports(element.library!);
     imports.add(_getImportForElement(element));
     generateBuilderFactory = GeneratedBuilderFactory(objects: [], path: '');
@@ -93,11 +95,8 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   ClassResult? _getFieldDeclare(FieldElement field) {
     StringBuffer sb = StringBuffer();
     if (!field.isSynthetic) {
-      final typeText = _getClassNameFromType(field.type.toString());
       ClassResult? result;
       if (field.type.isDartCoreList) {
-        sb.writeln('//isDartCoreList ${typeText.runtimeType.toString()}');
-        print("test list");
         result = _getClassTextForList(
             type: field.type as InterfaceType, varName: field.name);
         if (result?.body.isNotEmpty == true) {
