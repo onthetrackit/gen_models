@@ -68,8 +68,6 @@ class GenModelsBuilder extends LibraryBuilder {
 
   @override
   Future<void> build(BuildStep buildStep) async {
-    print(
-        'domainDir:${domainDir} ==${options == null}  == ${options?.config.length}');
     count++;
     _imports.clear();
     _funcs.clear();

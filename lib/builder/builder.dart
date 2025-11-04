@@ -34,7 +34,6 @@ class IndexingBuilder implements Builder {
 
     if (indexFile.existsSync() && !isDeleted) {
       final content = indexFile.readAsStringSync().split(fileSeparator);
-
       indexFile.deleteSync();
     }
     final resutl = await _inner.getBuildOutput(buildStep);

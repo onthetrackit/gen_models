@@ -23,8 +23,8 @@ builders:
     runs_before: ["gen_models|mergeBuilder"]
     defaults:
       options:
-        data_dir: "lib/data/models"
-        domain_dir: "lib/domain/models"
+        data_dir: "data/models"
+        domain_dir: "domain/models"
 #  mergeBuilder:
 #    import: "package:gen_models/merge_files.dart"
 #    builder_factories: ["mergeBuilder"]

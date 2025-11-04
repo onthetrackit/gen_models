@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:build/build.dart';
@@ -6,8 +8,6 @@ import 'package:gen_models/constants/app_values.dart';
 import 'package:gen_models/string_utils.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:collection/collection.dart';
-
-import 'builder/builder.dart';
 import 'builder/gen_models_builder.dart';
 import 'constants/build_option_keys.dart';
 
@@ -27,6 +27,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
 
   String? dataDir;
   String? domainDir;
+  String? currentPackage;
 
   GenModelsGenerator({this.options}) {
     dataDir ??= options?.config[BuildOptionKeys.dataDir];
@@ -36,12 +37,23 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   @override
   Future<String?> generateForAnnotatedElement(
       Element element, ConstantReader annotation, BuildStep buildStep) async {
+    currentPackage ??= StringUtils.getCurrentPackage(element: element);
+    print('currentPackage${currentPackage}');
     final buffer = StringBuffer();
-    path = _getPath(element);
-    print('path==${path}');
+    path = StringUtils.getPath(element, isRemovePackage: true);
     List<String> imports = _getImports(element.library!);
     imports.add(_getImportForElement(element));
     generateBuilderFactory = GeneratedBuilderFactory(objects: [], path: '');
+    final dtoPath = StringUtils.getDTOPath(
+        element: element,
+        annotation: annotation,
+        buildStep: buildStep,
+        domainDir: domainDir,
+        dataDir: dataDir);
+    print('dtoPath$dtoPath');
+    if (dtoPath.isNotEmpty == true) {
+      imports.add("import '${dtoPath}';");
+    }
     final classes = _getBody(element.library!, annotation);
     List<String> bodies = [];
     classes.forEach(
@@ -59,6 +71,12 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     onDetectedClassPaths?.call(data: generateBuilderFactory!);
     return buffer.toString();
   }
+
+  // getTarget() {
+  //   final target = annotation.read('target');
+  //   final targetType = target.typeValue;
+  //   targetType.element?.children.forEach((element) {});
+  // }
 
   List<ClassResult> _getBody(
       LibraryElement library, ConstantReader annotation) {
@@ -93,7 +111,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   }
 
   ClassResult? _getFieldDeclare(FieldElement field) {
-    StringBuffer sb = StringBuffer();
     if (!field.isSynthetic) {
       ClassResult? result;
       if (field.type.isDartCoreList) {
@@ -184,15 +201,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     return sb;
   }
 
-  String _getPath(Element? element) {
-    return element?.location?.components
-            .where(
-              (element) => element.isNotEmpty == true,
-            )
-            .firstOrNull ??
-        '';
-  }
-
   String _convertImport(String text) {
     final splits = text.split(" ");
     final packages = splits[2].substring(1).split("/");
@@ -202,7 +210,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   }
 
   String _getImportForElement(Element element) {
-    return "import '${_getPath(element)}';";
+    return "import '${StringUtils.getPath(element)}';";
   }
 
   String _getClassNameFromType(String? type) {
