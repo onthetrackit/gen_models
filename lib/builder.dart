@@ -8,7 +8,7 @@ import 'package:source_gen/source_gen.dart';
 import 'generator.dart';
 
 Builder genBuilder(BuilderOptions options) {
-  final libBuilder = GenModelsBuilder(GenModelsGenerator(),
+  final libBuilder = GenModelsBuilder(GenModelsGenerator(options: options),
       generatedExtension: '.mapper.dart',options: options);
 
   // Trả builder "bọc"

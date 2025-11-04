@@ -8,6 +8,7 @@ import 'package:source_gen/source_gen.dart';
 import 'package:collection/collection.dart';
 
 import 'builder.dart';
+import 'constants/build_option_keys.dart';
 
 typedef GetClassPaths = void Function({required GeneratedBuilderFactory data});
 
@@ -21,15 +22,21 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   final newObj = StringUtils.newObj;
   final fromDTO = StringUtils.methodConvertName;
   final dtoObject = StringUtils.dtoObject;
+  BuilderOptions? options;
+
+  String? dataDir;
+  String? domainDir;
+
+  GenModelsGenerator({this.options}) {
+    dataDir ??= options?.config[BuildOptionKeys.dataDir];
+    domainDir ??= options?.config[BuildOptionKeys.domainDir];
+  }
 
   @override
   Future<String?> generateForAnnotatedElement(
       Element element, ConstantReader annotation, BuildStep buildStep) async {
     final buffer = StringBuffer();
-
     path = _getPath(element);
-    print('=============$path');
-    final importPath = 'lib/data/models/';
     List<String> imports = _getImports(element.library!);
     imports.add(_getImportForElement(element));
     generateBuilderFactory = GeneratedBuilderFactory(objects: [], path: '');
@@ -54,7 +61,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   List<ClassResult> _getBody(
       LibraryElement library, ConstantReader annotation) {
     final reader = LibraryReader(library);
-    final resultStrings = StringBuffer();
     List<ClassResult> results = [];
     reader.classes.forEach((cls) {
       objs.add(cls);
@@ -86,7 +92,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
 
   ClassResult? _getFieldDeclare(FieldElement field) {
     StringBuffer sb = StringBuffer();
-    List<String> imports = [];
     if (!field.isSynthetic) {
       final typeText = _getClassNameFromType(field.type.toString());
       ClassResult? result;
@@ -103,7 +108,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
             field: field.type.element!, varName: field.name);
       }
       return result;
-      return ClassResult(imports: imports, body: sb.toString());
     }
     return null;
   }
@@ -127,7 +131,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
 
   ClassResult _getClassResultForIntorator(
       {required Element field, required String varName}) {
-    // final dtoObject = obj ?? StringUtils.dtoObject;
     ClassResult result = ClassResult();
     final name = field.name ?? '';
     final isGenModels = (isGenModelsClass(field));
@@ -148,34 +151,23 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
       {required InterfaceType type, required String varName, String? obj}) {
     StringBuffer sb = StringBuffer();
     final first = type.typeArguments.firstOrNull;
-    // if (first is DynamicType) {
-    //
-    // }
-    // if (first == null) {
-    //   return _getClassText(first as ClassElement);
-    // }
-    print('asf412341234234     ${type.toString()}');
     ClassResult? result = ClassResult();
     if (first == null) {
-      print('${varName}   ===first == null');
       return _getClassResultForIntorator(
           field: type.element, varName: 'element');
     } else if (first is InterfaceType) {
       result =
           _getClassTextForList(type: first, varName: varName, obj: 'element');
-      print('${varName}   ===(first is InterfaceType)  ===${type.name}');
     } else {
-      print('${varName}   ===else');
       result = _getClassResultForIntorator(
         field: type.element,
         varName: 'element',
       );
     }
-    print('body====:${first == null}---${result?.body}');
     if (result != null) {
       sb.writeln(
           '''${obj?.isNotEmpty == true ? '' : '${newObj}.${varName}='}${obj != null ? obj : '${dtoObject}?.${obj ?? varName}'}?.map((element)=>${result.body}).toList()??[]''');
-      return ClassResult(body: sb.toString(), imports: result.imports ?? []);
+      return ClassResult(body: sb.toString(), imports: result.imports);
     }
     return null;
   }
@@ -205,7 +197,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   String _convertImport(String text) {
     final splits = text.split(" ");
     final packages = splits[2].substring(1).split("/");
-    //import source /gen_del3/lib/abc/test.dart
     String result =
         "${splits[0]} 'package:${packages.first}/${packages.sublist(2).join('/')}';";
     return result;
