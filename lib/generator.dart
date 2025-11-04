@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:math';
 
 import 'package:analyzer/dart/element/element.dart';
@@ -54,7 +55,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     if (dtoPath.isNotEmpty == true) {
       imports.add("import '${dtoPath}';");
     }
-    final classes = _getBody(element.library!, annotation);
+    final classes = _getBody(element.library!, element.library!, annotation);
     List<String> bodies = [];
     classes.forEach(
       (element) {
@@ -72,33 +73,39 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     return buffer.toString();
   }
 
-  // getTarget() {
-  //   final target = annotation.read('target');
-  //   final targetType = target.typeValue;
-  //   targetType.element?.children.forEach((element) {});
-  // }
-
-  List<ClassResult> _getBody(
-      LibraryElement library, ConstantReader annotation) {
-    final reader = LibraryReader(library);
+  List<ClassResult> _getBody(LibraryElement currentLibrary,
+      LibraryElement targetLibrary, ConstantReader annotation) {
+    final currentReader = LibraryReader(currentLibrary);
+    final targetReader = LibraryReader(targetLibrary);
+    HashMap<String, ClassElement> currentClasses =
+        _getMapElements(currentReader.classes);
+    HashMap<String, ClassElement> targetClasses =
+        _getMapElements(targetReader.classes);
     List<ClassResult> results = [];
-    reader.classes.forEach((cls) {
+    currentReader.classes.forEach((cls) {
       objs.add(cls);
-      results.add(_getClassText(cls));
+      //todo check null targetClasses[cls.name]
+      results.add(_getClassResult(cls, targetClasses[cls.name]!));
     });
     return results;
   }
 
-  ClassResult _getClassText(ClassElement cls) {
+  ClassResult _getClassResult(ClassElement cls, ClassElement targetClass) {
     StringBuffer sb = StringBuffer();
     final dtoClass = StringUtils.getDTOClass(cls.name);
     final mapperClass = StringUtils.getMapperClass(cls.name);
     final domainClass = '${cls.name}';
     sb.writeln('class ${mapperClass}{');
-    sb.writeln('  static ${domainClass} $fromDTO($dtoClass? ${dtoObject}){');
+    sb.writeln('  static ${domainClass}? $fromDTO($dtoClass? ${dtoObject}){');
+    sb.writeln('  if(${dtoObject}==null) return null;');
     sb.writeln('  ${domainClass} ${newObj} = $domainClass();');
     List<String> imports = [];
-    cls.fields.forEach((field) {
+    HashMap<String, FieldElement> currentFields = _getMapElements(cls.fields);
+    HashMap<String, FieldElement> targetFields =
+        _getMapElements(targetClass.fields);
+    Set<String> targetKeys = Set.from(targetFields.keys);
+    // currentFields.removeWhere((key, value) => !targetKeys.contains(key));
+    currentFields.forEach((key, field) {
       final result = _getFieldDeclare(field);
       if (result != null) {
         imports.addAll(result.imports);
@@ -110,32 +117,43 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     return ClassResult(body: sb.toString(), imports: imports);
   }
 
-  ClassResult? _getFieldDeclare(FieldElement field) {
-    if (!field.isSynthetic) {
-      ClassResult? result;
-      if (field.type.isDartCoreList) {
-        result = _getClassTextForList(
-            type: field.type as InterfaceType, varName: field.name);
-        if (result?.body.isNotEmpty == true) {
-          result?.body += ';';
-        }
-      } else if (field.type.element != null) {
-        result = _getClassResultForNotIntorator(
-            field: field.type.element!, varName: field.name);
-      }
-      return result;
-    }
-    return null;
+  HashMap<String, T> _getMapElements<T extends Element>(Iterable<T> elements) {
+    HashMap<String, T> result = HashMap();
+    (elements)
+        .where(
+      (element) => !element.isSynthetic,
+    )
+        .forEach(
+      (element) {
+        result[element.name ?? ''] = element;
+      },
+    );
+    return result;
   }
 
-  ClassResult _getClassResultForNotIntorator(
+  ClassResult? _getFieldDeclare(FieldElement field) {
+    ClassResult? result;
+    if (field.type.isDartCoreList) {
+      result = _getClassTextForList(
+          type: field.type as InterfaceType, varName: field.name);
+      if (result?.body.isNotEmpty == true) {
+        result?.body += ';';
+      }
+    } else if (field.type.element != null) {
+      result = _getClassResultForNotIterator(
+          field: field.type.element!, varName: field.name);
+    }
+    return result;
+  }
+
+  ClassResult _getClassResultForNotIterator(
       {required Element field, required String varName, String? obj}) {
     final dtoObject = obj ?? StringUtils.dtoObject;
     ClassResult result = ClassResult();
     final name = field.name ?? '';
     final isGenModels = (isGenModelsClass(field));
     if (AppValues.nativeTypes.contains(name) || !isGenModels) {
-      result.body = '   ${newObj}.${varName} = ${dtoObject}?.${varName};';
+      result.body = '   ${newObj}.${varName} = ${dtoObject}.${varName};';
     } else {
       result.body =
           '    ${newObj}.${varName} = ${_getClassNameFromType(field.name)}Mapper.$fromDTO(${dtoObject}.${varName});';
@@ -145,7 +163,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     return result;
   }
 
-  ClassResult _getClassResultForIntorator(
+  ClassResult _getClassResultForIterator(
       {required Element field, required String varName}) {
     ClassResult result = ClassResult();
     final name = field.name ?? '';
@@ -155,7 +173,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     } else {
       if ((isGenModelsClass(field))) {
         result.body =
-            '${_getClassNameFromType(field.name)}Mapper.$fromDTO(${varName})';
+            '${_getClassNameFromType(field.name)}Mapper.$fromDTO(${varName})!';
         result.imports.add(
             _getImportForElement(field).replaceAll('.dart', '.mapper.dart'));
       }
@@ -169,20 +187,20 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     final first = type.typeArguments.firstOrNull;
     ClassResult? result = ClassResult();
     if (first == null) {
-      return _getClassResultForIntorator(
+      return _getClassResultForIterator(
           field: type.element, varName: 'element');
     } else if (first is InterfaceType) {
       result =
           _getClassTextForList(type: first, varName: varName, obj: 'element');
     } else {
-      result = _getClassResultForIntorator(
+      result = _getClassResultForIterator(
         field: type.element,
         varName: 'element',
       );
     }
     if (result != null) {
       sb.writeln(
-          '''${obj?.isNotEmpty == true ? '' : '${newObj}.${varName}='}${obj != null ? obj : '${dtoObject}?.${obj ?? varName}'}?.map((element)=>${result.body}).toList()??[]''');
+          '''${obj?.isNotEmpty == true ? '' : '${newObj}.${varName}='}${obj != null ? obj : '${dtoObject}.${obj ?? varName}'}?.map((element)=>${result.body}).toList()??[]''');
       return ClassResult(body: sb.toString(), imports: result.imports);
     }
     return null;
