@@ -7,13 +7,15 @@ class ImportInfo {
   String? fileName;
   String? mapperFileName;
   String? prefix;
+  String? mapperPrefix;
 
   String getMapperImport({String? prefix, bool isFullImport = true}) {
-    return 'mapper' +
+    return
         StringUtils.getImportForElement(
-            path: StringUtils.getMapperPath(import ?? '')) +
+            path: StringUtils.getMapperPath(import ?? ''),
+            isAddSemicolon: false) +
         StringUtils.addPrefixAndSuffix(
-            text: prefix ?? this.prefix, prefix: ' as ');
+            text: prefix ?? this.mapperPrefix, prefix: ' as ')+';';
   }
 
   String getImportPrefix({String? prefix}) {

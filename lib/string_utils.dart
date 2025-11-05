@@ -105,8 +105,8 @@ class StringUtils {
     return path.replaceAll(RegExp(r'.dart$'), '.mapper.dart');
   }
 
-  static String getImportForElement({Element? element, String? path}) {
-    return "import '${path ?? StringUtils.getPath(element)}';";
+  static String getImportForElement({Element? element, String? path,bool isAddSemicolon=true}) {
+    return "import '${path ?? StringUtils.getPath(element)}'${isAddSemicolon?';':''}";
   }
 
   static String getDTOPath(

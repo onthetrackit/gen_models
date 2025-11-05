@@ -4,6 +4,7 @@ import 'package:gen_models/constants/build_option_keys.dart';
 import 'package:gen_models/models/inport_info.dart';
 import 'package:gen_models/string_utils.dart';
 import 'package:source_gen/source_gen.dart';
+import 'package:collection/collection.dart';
 
 import '../generator.dart';
 
@@ -22,7 +23,8 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
   String? domainDir;
   Set<String> classNames = Set();
 
-  GenModelsBuilder(Generator generator, {
+  GenModelsBuilder(
+    Generator generator, {
     String Function(String code)? formatOutput,
     String generatedExtension = '.g.dart',
     List<String> additionalOutputExtensions = const [],
@@ -30,14 +32,14 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     bool allowSyntaxErrors = false,
     BuilderOptions? options,
   }) : super(
-    generator,
-    formatOutput: formatOutput,
-    generatedExtension: generatedExtension,
-    additionalOutputExtensions: additionalOutputExtensions,
-    header: header,
-    allowSyntaxErrors: allowSyntaxErrors,
-    options: options,
-  ) {
+          generator,
+          formatOutput: formatOutput,
+          generatedExtension: generatedExtension,
+          additionalOutputExtensions: additionalOutputExtensions,
+          header: header,
+          allowSyntaxErrors: allowSyntaxErrors,
+          options: options,
+        ) {
     this.options = options;
     dataDir ??= options?.config[BuildOptionKeys.dataDir];
     domainDir ??= options?.config[BuildOptionKeys.domainDir];
@@ -70,10 +72,11 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
 
   Future<GenModelsBuilderOutput> getBuildOutput(BuildStep buildStep) async {
     await build(buildStep);
+    appLog(['params12', _imports.length, _funcs.length]);
     return GenModelsBuilderOutput(
         imports: _imports.join('\n'),
         funcs: _funcs.join('\n'),
-    );
+        path: buildStep.inputId.path);
   }
 
   @override
@@ -82,11 +85,20 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     _imports = [];
     _funcs = [];
     generateBuilderFactory = GeneratedBuilderFactory();
-    generator.builderHashCode = hashCode.toString();
-    appLog(['start buildStep.inputId.path',buildStep.inputId.path]);
+    generator.currentGenerateBuilderFactory = generateBuilderFactory;
     final result = await super.build(buildStep);
-    appLog(['end buildStep.inputId.path',buildStep.inputId.path]);
+    appLog([
+      'generateBuilderFactory',
+      generateBuilderFactory.objectImportInfos.length,
+      generateBuilderFactory.objects.length,
+    ]);
     _generateContent();
+    _writeFile(buildStep: buildStep, content: '''
+  ${generateBuilderFactory.objectImportInfos.map(
+              (e) => e.import,
+            ).join('\n')}
+  ${generateBuilderFactory.bodies.join('\n\n')}
+    ''');
     return result;
   }
 
@@ -126,35 +138,30 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     _imports.addAll(generateBuilderFactory.objectImportInfos
         .where(
           (element) => element.import?.isNotEmpty == true,
-    )
+        )
         .map(
-          (e) => '123:{${e.getImportPrefix()}}',
-    )
+          (e) => '${e.getImportPrefix()}',
+        )
         .toList());
-    _imports.addAll(generateBuilderFactory.imports);
     generateBuilderFactory.objects.forEach(
-          (element) {
+      (element) {
         if (element.name?.isNotEmpty == true) {
           String className = element.name ?? '';
           _funcs.add(
-            '//MapperData(type: "${StringUtils.addPrefixAndSuffix(
-                text: element.prefix,
-                suffix: '.')}${className}", func: ${StringUtils
-                .addPrefixAndSuffix(
-                text: element.mapperPrefix, suffix: '.')}${element
-                .mapperClassName}.fromDTO)',
+            '//MapperData(type: "${StringUtils.addPrefixAndSuffix(text: element.prefix, suffix: '.')}${className}", func: ${StringUtils.addPrefixAndSuffix(text: element.mapperPrefix, suffix: '.')}${element.mapperClassName}.fromDTO)',
           );
         }
       },
     );
   }
+
 //
-// _writeFile(
-//     {String? path, String content = '', required BuildStep buildStep}) async {
-//   final outputId = AssetId(buildStep.inputId.package, path ?? filePath);
-//   await buildStep.writeAsString(outputId, content);
-// }
-//
+  _writeFile({String content = '', required BuildStep buildStep}) async {
+    final outputId = AssetId(buildStep.inputId.package,
+        StringUtils.getMapperPath(buildStep.inputId.path));
+    await buildStep.writeAsString(outputId, content);
+  }
+
 // Future<String> _readFile({String? path, required BuildStep buildStep}) async {
 //   final inputId = AssetId(buildStep.inputId.package, path ?? filePath);
 //   if (await buildStep.canRead(inputId))
@@ -166,22 +173,52 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
 class GeneratedBuilderFactory {
   List<GeneratedBuilderObject> objects;
   List<ImportInfo> objectImportInfos;
-  List<String> imports;
+  List<String> bodies;
   String? prefix;
   String path;
 
-  GeneratedBuilderFactory({List<GeneratedBuilderObject>? objects,
-    List<ImportInfo>? importInfos,
-    List<String>? imports,
-    String? prefix,
-    String? path,
-    String? mapperClassName,
-    String? mapperPrefix})
-      : objectImportInfos = importInfos ?? [],
-        imports = imports ?? [],
-        path = path ?? '',
-        objects = objects ?? [];
+  addImportInfo(ImportInfo importInfo) {
+    if (!hasImport(importInfo)) {
+      objectImportInfos.add(importInfo);
+    }
+  }
 
+  addAllImportInfo(List<ImportInfo> importInfos) {
+    importInfos.forEach(
+      (element) {
+        addImportInfo(element);
+      },
+    );
+  }
+
+  ImportInfo? getImportInfo(String? import) {
+    if (import?.isNotEmpty != true) {
+      return null;
+    }
+    return objectImportInfos.firstWhereOrNull(
+      (element) => element.import == import,
+    );
+  }
+
+  hasImport(ImportInfo importInfo) {
+    return objectImportInfos.firstWhereOrNull(
+          (element) => element.import == importInfo.import,
+        ) !=
+        null;
+  }
+
+  GeneratedBuilderFactory(
+      {List<GeneratedBuilderObject>? objects,
+      List<ImportInfo>? importInfos,
+      List<String>? bodies,
+      String? prefix,
+      String? path,
+      String? mapperClassName,
+      String? mapperPrefix})
+      : objectImportInfos = importInfos ?? [],
+        path = path ?? '',
+        objects = objects ?? [],
+        bodies = bodies ?? [];
 }
 
 class GeneratedBuilderObject {
@@ -190,10 +227,11 @@ class GeneratedBuilderObject {
   String mapperClassName;
   String mapperPrefix;
 
-  GeneratedBuilderObject({this.name,
-    String? prefix,
-    String? mapperClassName,
-    String? mapperPrefix})
+  GeneratedBuilderObject(
+      {this.name,
+      String? prefix,
+      String? mapperClassName,
+      String? mapperPrefix})
       : prefix = prefix ?? '',
         mapperClassName = mapperClassName ?? '',
         mapperPrefix = mapperPrefix ?? '';

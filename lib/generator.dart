@@ -17,7 +17,8 @@ import 'constants/build_option_keys.dart';
 class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   late BuilderFunc builderFunc;
   String? builderHashCode;
-  List<GeneratedBuilderObject> objs = [];
+
+  // List<GeneratedBuilderObject> objs = [];
   String? path = "";
   final modelPath = '/models';
   final newObj = StringUtils.newObj;
@@ -29,7 +30,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   String? domainDir;
   late GeneratedBuilderFactory currentGenerateBuilderFactory;
   late ImportInfo currentInportInfo;
-  late String prefix;
   Set<String> pathBuilded = Set();
 
   GenModelsGenerator({this.options}) {
@@ -41,22 +41,22 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   Future<String?> generateForAnnotatedElement(
       Element element, ConstantReader annotation, BuildStep buildStep) async {
     currentInportInfo = StringUtils.getInportInfo(element: element);
-    prefix = builderFunc.getPrefix();
-    currentGenerateBuilderFactory =
-        GeneratedBuilderFactory(objects: [], prefix: prefix);
-    currentInportInfo.prefix = prefix;
-    objs = [];
-    final buffer = StringBuffer();
+    currentGenerateBuilderFactory.prefix = builderFunc.getPrefix();
+    currentInportInfo.prefix = currentGenerateBuilderFactory.prefix;
     path = StringUtils.getPath(element, isRemovePackage: true);
-    List<String> imports = [];
-    if (!pathBuilded.contains(currentInportInfo.import)) {
-      currentGenerateBuilderFactory.imports = _getImports(element.library!);
-      pathBuilded.add(currentInportInfo.import!);
-    }
-    _getImports(element.library!);
+    List<String> imports = _getImports(element.library!);
+    // if (!pathBuilded.contains(currentInportInfo.import)) {
+    //   currentGenerateBuilderFactory
+    //       .addAllImportInfo(_getImports(element.library!)
+    //           .map(
+    //             (e) => ImportInfo(import: e),
+    //           )
+    //           .toList());
+    //   pathBuilded.add(currentInportInfo.import!);
+    // }
     imports.add(StringUtils.getImportForElement(element: element));
-    appLog(['main', StringUtils.getImportForElement(element: element)]);
-    imports.add(currentInportInfo.getMapperImport(prefix: prefix));
+    imports.add(currentInportInfo.getMapperImport(
+        prefix: currentGenerateBuilderFactory.prefix));
     imports.add(
         currentInportInfo.getMapperImport(prefix: builderFunc.getPrefix()));
     final dtoPath = StringUtils.getDTOPath(
@@ -75,12 +75,14 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     bodies.add(classes.body);
     imports = imports.toSet().toList();
     imports.sort();
-    buffer.writeln(imports.join('\n'));
-    buffer.writeln(bodies.join('\n\n'));
-    currentGenerateBuilderFactory.objects = objs;
-    currentGenerateBuilderFactory.imports = imports;
+    currentGenerateBuilderFactory.bodies.addAll(bodies);
+    currentGenerateBuilderFactory.addAllImportInfo(imports
+        .map(
+          (e) => ImportInfo(import: e),
+        )
+        .toList());
     builderFunc.onDetectedClassPaths(data: currentGenerateBuilderFactory);
-    return buffer.toString();
+    return '';
   }
 
   ClassResult _getBody(ClassElement cls, LibraryElement targetLibrary,
@@ -95,20 +97,33 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     // currentReader.classes.forEach((cls) {
     final generatedBuilderObject = GeneratedBuilderObject(
         name: cls.name,
-        prefix: prefix,
+        prefix: currentGenerateBuilderFactory.prefix,
         mapperClassName: StringUtils.getMapperClass(cls.name));
-    objs.add(generatedBuilderObject);
+    currentGenerateBuilderFactory.objects.add(generatedBuilderObject);
     final duplicate = builderFunc.checkDuplicateClassName(cls.name);
     if (duplicate) {
       appLog(['duplicate', duplicate]);
-      final importInfo = StringUtils.getInportInfo(element: cls);
+      var importInfo = StringUtils.getInportInfo(element: cls);
+      final addedImport =
+          currentGenerateBuilderFactory.getImportInfo(importInfo.import);
       if (currentInportInfo.package != importInfo.package) {
-        final prefix = builderFunc.getPrefix();
-        final mapperPrefix = builderFunc.getPrefix();
-        generatedBuilderObject.prefix = prefix;
-        generatedBuilderObject.mapperPrefix = mapperPrefix;
-        importInfo.prefix = prefix;
-        currentGenerateBuilderFactory.objectImportInfos.add(importInfo);
+        if (addedImport != null) {
+          importInfo = addedImport;
+          if (importInfo.prefix?.isNotEmpty != true) {
+            final prefix = builderFunc.getPrefix();
+            importInfo.prefix = prefix;
+          }
+          if (importInfo.mapperPrefix?.isNotEmpty != true) {
+            final prefix = builderFunc.getPrefix();
+            importInfo.mapperPrefix = prefix;
+          }
+        } else {
+          final mapperPrefix = builderFunc.getPrefix();
+          generatedBuilderObject.prefix = currentGenerateBuilderFactory.prefix;
+          generatedBuilderObject.mapperPrefix = mapperPrefix;
+          importInfo.prefix = currentGenerateBuilderFactory.prefix;
+        }
+        currentGenerateBuilderFactory.addImportInfo(importInfo);
         currentGenerateBuilderFactory.objects.add(generatedBuilderObject);
       }
     }
