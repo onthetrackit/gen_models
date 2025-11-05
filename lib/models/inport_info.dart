@@ -8,7 +8,8 @@ class ImportInfo {
   String? prefix;
 
   String getImportPrefix({String? prefix}) {
-    return '${StringUtils.getImportForElement(path: import ?? '', isAddSemicolon: false)} ${StringUtils.addPrefixAndSuffix(text: prefix ?? this.prefix, prefix: ' as ')}';
+    prefix=StringUtils.addPrefixAndSuffix(text: prefix ?? this.prefix, prefix: ' as ');
+    return '${StringUtils.getImportForElement(path: import ?? '', isAddSemicolon: prefix.isEmpty)} ${prefix.isEmpty?'':'${prefix};'}';
   }
 
   ImportInfo cloneToMapper() {

@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:build/build.dart';
 import 'package:gen_models/builder/builder_funcs.dart';
 import 'package:gen_models/constants/build_option_keys.dart';
-import 'package:gen_models/mapper_factory.dart';
 import 'package:gen_models/models/inport_info.dart';
 import 'package:gen_models/string_utils.dart';
 import 'package:source_gen/source_gen.dart';
@@ -130,12 +129,12 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     ImportInfoManager.instance.sort();
     final generateBuilderFactory = getBuildStepGenerated(buildStep);
     if (generateBuilderFactory == null) return;
-    final imports = ImportInfoManager.instance.importInfos
+    String imports = ImportInfoManager.instance.importInfos
         .map(
           (e) => e.getImportPrefix(),
         )
         .join('\n');
-
+  imports="import 'package:gen_models/mapper_factory.dart';\n${imports}";
     final funcs = generateBuilderFactory.objects.map((element) {
           if (element.name?.isNotEmpty == true) {
             String className = element.name ?? '';

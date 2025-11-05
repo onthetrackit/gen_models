@@ -20,18 +20,16 @@ class ImportInfoManager {
   }
 
   addImportInfo(ImportInfo importInfo) {
-    // if (!hasImport(importInfo)) {
-    //   //todo remove
-    //   importInfos.add(importInfo);
-    // }
-
-    if (hasImport(importInfo)) {
-      //todo remove
-      importInfos.removeWhere(
-            (element) => element.import == importInfo.import,
-      );
+    if (!hasImport(importInfo)) {
+      importInfos.add(importInfo);
     }
-    importInfos.add(importInfo);
+    // if (hasImport(importInfo)) {
+    //   //todo remove
+    //   importInfos.removeWhere(
+    //         (element) => element.import == importInfo.import,
+    //   );
+    // }
+    // importInfos.add(importInfo);
   }
 
   addAllImportInfo(List<ImportInfo> importInfos) {
@@ -61,12 +59,10 @@ class ImportInfoManager {
   ImportInfo getInfoFor(
       {required BuilderFunc builderFunc,
         required String name,
-        // required String package,
         required ImportInfo defaultImportInfo}) {
     final duplicate = builderFunc.checkAndAddDuplicateClassName(name);
     if (duplicate) {
       ImportInfo result = defaultImportInfo;
-      // if (defaultImportInfo.package != package) {
       final addedImport = getImportInfo(defaultImportInfo.import);
       if (addedImport != null) {
         result = addedImport;
@@ -77,7 +73,6 @@ class ImportInfoManager {
       } else {
         addImportInfo(result);
       }
-      // }
       print('check info:${result.prefix}');
       return result;
     }

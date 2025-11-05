@@ -58,8 +58,8 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     }
     path = StringUtils.getPath(element, isRemovePackage: true);
     List<String> imports = _getImports(element.library!);
-    imports.add(StringUtils.getImportForElement(element: element));
-    imports.add(StringUtils.getImportForElement(element: element));
+    // imports.add(StringUtils.getImportForElement(element: element));
+    // imports.add(StringUtils.getImportForElement(element: element));
     // imports.add(currentInportInfo.getMapperImport(
     //     prefix: currentGenerateBuilderFactory.prefix));
     // imports.add(
@@ -187,8 +187,8 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     } else {
       result.body =
           '    ${newObj}.${varName} = ${_getClassNameFromType(field.name)}Mapper.$fromDTO(${dtoObject}.${varName});';
-      result.imports.add(StringUtils.getImportForElement(element: field)
-          .replaceAll('.dart', '.mapper.dart'));
+      // result.imports.add(StringUtils.getImportForElement(element: field)
+      //     .replaceAll('.dart', '.mapper.dart'));
     }
     return result;
   }
@@ -204,8 +204,8 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
       if ((isGenModelsClass(field))) {
         result.body =
             '${_getClassNameFromType(field.name)}Mapper.$fromDTO(${varName})!';
-        result.imports.add(StringUtils.getImportForElement(element: field)
-            .replaceAll('.dart', '.mapper.dart'));
+        // result.imports.add(StringUtils.getImportForElement(element: field)
+        //     .replaceAll('.dart', '.mapper.dart'));
       }
     }
     return result;
@@ -253,7 +253,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     final splits = text.split(" ");
     final packages = splits[2].substring(1).split("/");
     String result =
-        "${splits[0]} 'package:${packages.first}/${packages.sublist(2).join('/')}';";
+        "package:${packages.first}/${packages.sublist(2).join('/')}";
     return result;
   }
 
