@@ -41,7 +41,9 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   Future<String?> generateForAnnotatedElement(
       Element element, ConstantReader annotation, BuildStep buildStep) async {
     currentInportInfo = StringUtils.getInportInfo(element: element);
-    currentGenerateBuilderFactory.prefix = builderFunc.getPrefix();
+    if(currentGenerateBuilderFactory.prefix?.isNotEmpty!=true) {
+      currentGenerateBuilderFactory.prefix = builderFunc.getPrefix();
+    }
     currentInportInfo.prefix = currentGenerateBuilderFactory.prefix;
     path = StringUtils.getPath(element, isRemovePackage: true);
     List<String> imports = _getImports(element.library!);
@@ -67,7 +69,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     bodies.add(classes.body);
     imports = imports.toSet().toList();
     imports.sort();
-    appLog(imports,prefix: '======--');
     currentGenerateBuilderFactory.bodies.addAll(bodies);
     currentGenerateBuilderFactory.addAllImportInfo(imports
         .map(

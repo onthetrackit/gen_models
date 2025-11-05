@@ -16,7 +16,7 @@ class MapperFactory {
 
   addMapper(String type, dynamic func) {
     if (_mapFuncs[type] == null) {
-      _mapFuncs[type] = MapperData(type: type, func: func);
+      _mapFuncs[type] = MapperData(prefixName: type, func: func);
     } else {
 
     }
@@ -30,8 +30,9 @@ class MapperFactory {
 }
 
 class MapperData {
-  String? type;
+  String? prefixName;
+  String? name;
   dynamic func;
 
-  MapperData({this.type, this.func});
+  MapperData({this.prefixName, this.func,this.name});
 }
