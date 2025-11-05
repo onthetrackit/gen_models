@@ -10,6 +10,7 @@ import 'package:source_gen/source_gen.dart';
 import 'package:collection/collection.dart';
 
 import '../generator.dart';
+import 'import_info_manager.dart';
 
 final String markHeader = '//__markHeader__';
 final String markBody = '//__markBody__';
@@ -138,15 +139,13 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     final funcs = generateBuilderFactory.objects.map((element) {
           if (element.name?.isNotEmpty == true) {
             String className = element.name ?? '';
-            return 'MapperData(name:"${element.name}",prefixName: "${StringUtils.addPrefixAndSuffix(text: element.importInfo?.prefix, suffix: '.')}${className}", func: ${StringUtils.addPrefixAndSuffix(text: element.importInfo?.mapperPrefix, suffix: '.')}${element.mapperClassName}.fromDTO)';
+            return 'MapperData(name:"${element.name}",prefixName: "${StringUtils.addPrefixAndSuffix(text: element.importInfo?.prefix, suffix: '.')}${className}", func: ${StringUtils.addPrefixAndSuffix(text: element.mapperImportInfo?.prefix, suffix: '.')}${element.mapperClassName}.fromDTO)';
           }
         }).join(',\n') +
         ',';
-    content='$imports\n${content.substring(content
-        .indexOf(markHeader))}';
-    content = content
-        .replaceAll(markBody,
-            '${funcs}\n//${generateBuilderFactory.path}\n${markBody}');
+    content = '$imports\n${content.substring(content.indexOf(markHeader))}';
+    content = content.replaceAll(
+        markBody, '${funcs}\n//${generateBuilderFactory.path}\n${markBody}');
     indexFile.writeAsStringSync(content, mode: FileMode.write);
   }
 
@@ -164,55 +163,6 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
 // }
 }
 
-class ImportInfoManager {
-  static ImportInfoManager _instance = ImportInfoManager._private();
-
-  static ImportInfoManager get instance => _instance;
-
-  ImportInfoManager._private();
-
-  List<ImportInfo> importInfos = [];
-  sort(){
-    importInfos.sort((a, b) => a.import!.compareTo(b.import!),);
-  }
-  addImportInfo(ImportInfo importInfo) {
-    // if (!hasImport(importInfo)) {
-    //   //todo remove
-    //   importInfos.add(importInfo);
-    // }
-
-    if (hasImport(importInfo)) {
-      //todo remove
-      importInfos.removeWhere((element) => element.import == importInfo.import,);
-
-    }
-    importInfos.add(importInfo);
-  }
-
-  addAllImportInfo(List<ImportInfo> importInfos) {
-    importInfos.forEach(
-      (element) {
-        addImportInfo(element);
-      },
-    );
-  }
-
-  ImportInfo? getImportInfo(String? import) {
-    if (import?.isNotEmpty != true) {
-      return null;
-    }
-    return importInfos.firstWhereOrNull(
-      (element) => element.import == import,
-    );
-  }
-
-  hasImport(ImportInfo importInfo) {
-    return importInfos.firstWhereOrNull(
-          (element) => element.import == importInfo.import,
-        ) !=
-        null;
-  }
-}
 
 class GeneratedBuilderFactory {
   List<GeneratedBuilderObject> _objects;
@@ -243,6 +193,7 @@ class GeneratedBuilderObject {
   String? name;
   String mapperClassName;
   ImportInfo? importInfo;
+  ImportInfo? mapperImportInfo;
 
   GeneratedBuilderObject({this.name, this.importInfo, String? mapperClassName})
       : mapperClassName = mapperClassName ?? '';

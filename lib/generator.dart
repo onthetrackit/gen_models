@@ -12,6 +12,7 @@ import 'package:gen_models/string_utils.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:collection/collection.dart';
 import 'builder/gen_models_builder.dart';
+import 'builder/import_info_manager.dart';
 import 'constants/build_option_keys.dart';
 
 class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
@@ -47,11 +48,10 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     final currentGenerateBuilderFactory =
         getGeneratedBuilderFactory(currentInportInfo.dirPath);
     if (currentGenerateBuilderFactory == null) return '';
-    if (ImportInfoManager.instance.getImportInfo(currentInportInfo.import) != null) {
-      currentInportInfo = ImportInfoManager.instance.getImportInfo(currentInportInfo.import)!;
-    } else {
-      currentInportInfo.prefix = builderFunc.getPrefix();
-      currentInportInfo.mapperPrefix = builderFunc.getPrefix();
+    if (ImportInfoManager.instance.getImportInfo(currentInportInfo.import) !=
+        null) {
+      currentInportInfo =
+          ImportInfoManager.instance.getImportInfo(currentInportInfo.import)!;
     }
     if (currentGenerateBuilderFactory.prefix?.isNotEmpty != true) {
       currentGenerateBuilderFactory.prefix = currentInportInfo.prefix;
@@ -107,35 +107,17 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     final generatedBuilderObject = GeneratedBuilderObject(
         name: cls.name, mapperClassName: StringUtils.getMapperClass(cls.name));
     currentGenerateBuilderFactory.objects.add(generatedBuilderObject);
-    final duplicate = builderFunc.checkAndAddDuplicateClassName(cls.name);
-    final mapperDuplicate = builderFunc.checkAndAddDuplicateMapperClassName(
-        generatedBuilderObject.mapperClassName);
-    generatedBuilderObject.importInfo = fileInportInfo;
-    if (duplicate) {
-      print('before check info:${fileInportInfo.prefix}');
-      ImportInfo result = fileInportInfo;
-      if (fileInportInfo.package != currentClassInportInfo.package) {
-        final addedImport =
-            ImportInfoManager.instance.getImportInfo(fileInportInfo.import);
-        if (addedImport != null) {
-          result = addedImport;
-          if (result.prefix?.isNotEmpty != true) {
-            final prefix = builderFunc.getPrefix();
-            result.prefix = prefix;
-          }
-        } else {
-          ImportInfoManager.instance.addImportInfo(result);
-        }
-      }
-      print('check info:${result.prefix}');
-      if (mapperDuplicate) {
-        result.mapperPrefix ??= builderFunc.getPrefix();
-      }
-      generatedBuilderObject.importInfo = result;
-    }
-    //todo check null targetClasses[cls.name]
+    generatedBuilderObject.importInfo = ImportInfoManager.instance.getInfoFor(
+      builderFunc: builderFunc,
+      name: cls.name,
+      defaultImportInfo: currentClassInportInfo,
+    );
+    generatedBuilderObject.mapperImportInfo = ImportInfoManager.instance.getInfoFor(
+      builderFunc: builderFunc,
+      name: generatedBuilderObject.mapperClassName,
+      defaultImportInfo: currentClassInportInfo.cloneToMapper(),
+    );
     return _getClassResult(cls, null);
-    // });
   }
 
   ClassResult _getClassResult(ClassElement cls, ClassElement? targetClass) {
