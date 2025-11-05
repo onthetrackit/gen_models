@@ -29,6 +29,7 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
   String? dataDir;
   String? domainDir;
   Set<String> classNames = Set();
+  Set<String> mapperClassNames = Set();
 
   GenModelsBuilder(
     Generator generator, {
@@ -64,9 +65,15 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
   void onDetectedClassPaths({required GeneratedBuilderFactory data}) {}
 
   @override
-  bool checkDuplicateClassName(String className) {
+  bool checkAndAddDuplicateClassName(String className) {
     final isContain = classNames.contains(className);
     classNames.add(className);
+    return isContain;
+  }
+  @override
+  bool checkAndAddDuplicateMapperClassName(String className) {
+    final isContain = mapperClassNames.contains(className);
+    mapperClassNames.add(className);
     return isContain;
   }
 
@@ -156,15 +163,17 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
 //   return '';
 // }
 }
+class ImportInfoManager{
 
+}
 class GeneratedBuilderFactory {
   List<GeneratedBuilderObject> _objects;
 
   List<GeneratedBuilderObject> get objects => _objects;
-  List<ImportInfo> objectImportInfos;
   List<String> bodies;
   String? prefix;
   String path;
+  List<ImportInfo> objectImportInfos;
 
   addObject(GeneratedBuilderObject obj) {
     _objects.add(obj);

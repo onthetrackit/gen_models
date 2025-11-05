@@ -10,7 +10,7 @@ class ImportInfo {
   String? mapperPrefix;
 
   String getMapperImport({String? prefix, bool isFullImport = true}) {
-    return
+    return '222'+
         StringUtils.getImportForElement(
             path: StringUtils.getMapperPath(import ?? ''),
             isAddSemicolon: false) +
@@ -19,7 +19,7 @@ class ImportInfo {
   }
 
   String getImportPrefix({String? prefix}) {
-    return '$import ${StringUtils.addPrefixAndSuffix(text: prefix ?? this.prefix, prefix: ' as ')}';
+    return '111=${prefix ?? this.prefix}=$import ${StringUtils.addPrefixAndSuffix(text: prefix ?? this.prefix, prefix: ' as ')}';
   }
 
   ImportInfo(

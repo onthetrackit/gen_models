@@ -29,7 +29,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   String? dataDir;
   String? domainDir;
   late Map<String, GeneratedBuilderFactory> mapGenerateBuilderFactory;
-  late ImportInfo currentInportInfo;
+  late HashMap<String, ImportInfo> mapCurrentInportInfo=HashMap();
   Set<String> pathBuilded = Set();
 
   GenModelsGenerator({this.options}) {
@@ -40,10 +40,18 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   GeneratedBuilderFactory? getGeneratedBuilderFactory(String? path) =>
       mapGenerateBuilderFactory['lib/${path}'];
 
+  ImportInfo? getImportInfo(String? path) =>
+      mapCurrentInportInfo['${path}'];
+
+  addImportInfo(String path, ImportInfo import) {
+    mapCurrentInportInfo['${path}'] = import;
+  }
+
   @override
   Future<String?> generateForAnnotatedElement(
       Element element, ConstantReader annotation, BuildStep buildStep) async {
-    currentInportInfo = StringUtils.getInportInfo(element: element);
+    final currentInportInfo = StringUtils.getInportInfo(element: element);
+    addImportInfo(currentInportInfo.dirPath!, currentInportInfo);
     if (!StringUtils.checkFileName(currentInportInfo.dirPath ?? '')) return '';
     // appLog([
     //   'generateForAnnotatedElement1',
@@ -103,20 +111,23 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     //     _getMapElements(targetReader.classes);
     // List<ClassResult> results = [];
     // currentReader.classes.forEach((cls) {
-    currentInportInfo = StringUtils.getInportInfo(element: cls);
+    ImportInfo currentInportInfo = StringUtils.getInportInfo(element: cls);
     final currentGenerateBuilderFactory =
         getGeneratedBuilderFactory(currentInportInfo.dirPath)!;
     final generatedBuilderObject = GeneratedBuilderObject(
         name: cls.name,
         prefix: currentGenerateBuilderFactory.prefix,
         mapperClassName: StringUtils.getMapperClass(cls.name));
+    currentInportInfo=currentGenerateBuilderFactory.getImportInfo(currentInportInfo.import)!;
     currentGenerateBuilderFactory.objects.add(generatedBuilderObject);
-    final duplicate = builderFunc.checkDuplicateClassName(cls.name);
-    if (duplicate) {
-      appLog(['duplicate', duplicate]);
+    final duplicate = builderFunc.checkAndAddDuplicateClassName(cls.name);
+    final mapperDuplicate = builderFunc.checkAndAddDuplicateMapperClassName(
+        generatedBuilderObject.mapperClassName);
+    if (duplicate || mapperDuplicate) {
       var importInfo = StringUtils.getInportInfo(element: cls);
       final addedImport =
           currentGenerateBuilderFactory.getImportInfo(importInfo.import);
+      print('before check info:${importInfo.prefix}');
       if (currentInportInfo.package != importInfo.package) {
         if (addedImport != null) {
           importInfo = addedImport;
@@ -124,17 +135,17 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
             final prefix = builderFunc.getPrefix();
             importInfo.prefix = prefix;
           }
-          if (importInfo.mapperPrefix?.isNotEmpty != true) {
-            final prefix = builderFunc.getPrefix();
-            importInfo.mapperPrefix = prefix;
-          }
         } else {
-          final mapperPrefix = builderFunc.getPrefix();
           generatedBuilderObject.prefix = currentGenerateBuilderFactory.prefix;
-          generatedBuilderObject.mapperPrefix = mapperPrefix;
           importInfo.prefix = currentGenerateBuilderFactory.prefix;
         }
         currentGenerateBuilderFactory.addImportInfo(importInfo);
+      }
+      print('check info:${importInfo.prefix}');
+      if (mapperDuplicate) {
+        final prefix = builderFunc.getPrefix();
+        importInfo.mapperPrefix = prefix;
+        generatedBuilderObject.mapperPrefix = prefix;
       }
     }
     //todo check null targetClasses[cls.name]

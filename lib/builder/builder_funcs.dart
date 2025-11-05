@@ -4,6 +4,7 @@ abstract class BuilderFunc{
 
   void onDetectedClassPaths({required GeneratedBuilderFactory data});
 
-  bool checkDuplicateClassName(String className);
+  bool checkAndAddDuplicateClassName(String className);
+  bool checkAndAddDuplicateMapperClassName(String className);
   String getPrefix();
 }
