@@ -43,25 +43,25 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   @override
   Future<String?> generateForAnnotatedElement(
       Element element, ConstantReader annotation, BuildStep buildStep) async {
-    ImportInfo currentInportInfo = StringUtils.getInportInfo(element: element);
-    if (!StringUtils.checkFileName(currentInportInfo.dirPath ?? '')) return '';
-    final currentGenerateBuilderFactory =
-        getGeneratedBuilderFactory(currentInportInfo.dirPath);
-    if (currentGenerateBuilderFactory == null) return '';
-    if (ImportInfoManager.instance.getImportInfo(currentInportInfo.import) !=
-        null) {
-      currentInportInfo =
-          ImportInfoManager.instance.getImportInfo(currentInportInfo.import)!;
-    }
-    if (currentGenerateBuilderFactory.prefix?.isNotEmpty != true) {
-      currentGenerateBuilderFactory.prefix = currentInportInfo.prefix;
-    }
+    ImportInfo currentImportInfo = StringUtils.getImportInfo(element: element);
+    if (!StringUtils.checkFileName(currentImportInfo.dirPath ?? '')) return '';
+    final currentGeneratedBuilderFactory =
+        getGeneratedBuilderFactory(currentImportInfo.dirPath);
+    if (currentGeneratedBuilderFactory == null) return '';
+    // if (ImportInfoManager.instance.getImportInfo(currentInportInfo.import) !=
+    //     null) {
+    //   currentInportInfo =
+    //       ImportInfoManager.instance.getImportInfo(currentInportInfo.import)!;
+    // }
+    // if (currentGeneratedBuilderFactory.prefix?.isNotEmpty != true) {
+    //   currentGeneratedBuilderFactory.prefix = currentInportInfo.prefix;
+    // }
     path = StringUtils.getPath(element, isRemovePackage: true);
     List<String> imports = _getImports(element.library!);
     // imports.add(StringUtils.getImportForElement(element: element));
     // imports.add(StringUtils.getImportForElement(element: element));
     // imports.add(currentInportInfo.getMapperImport(
-    //     prefix: currentGenerateBuilderFactory.prefix));
+    //     prefix: currentGeneratedBuilderFactory.prefix));
     // imports.add(
     //     currentInportInfo.getMapperImport(prefix: builderFunc.getPrefix()));
     final dtoPath = StringUtils.getDTOPath(
@@ -73,26 +73,30 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     if (dtoPath.isNotEmpty == true) {
       imports.add(dtoPath);
     }
-    final classes = _getBody(element as ClassElement, element.library!,
-        annotation, currentInportInfo);
+    final classes = _getBody(element as ClassElement, element.library,
+        annotation, currentGeneratedBuilderFactory);
     List<String> bodies = [];
     imports.addAll(classes.imports);
     bodies.add(classes.body);
     imports = imports.toSet().toList();
     imports.sort();
-    currentGenerateBuilderFactory.bodies.addAll(bodies);
+    currentGeneratedBuilderFactory.bodies.addAll(bodies);
     ImportInfoManager.instance.addAllImportInfo(imports
         .map(
           (e) => ImportInfo(import: e),
         )
         .toList());
-    ImportInfoManager.instance.addImportInfo(currentInportInfo);
-    builderFunc.onDetectedClassPaths(data: currentGenerateBuilderFactory);
+    ImportInfoManager.instance.addImportInfo(currentImportInfo);
+    builderFunc.onDetectedClassPaths(data: currentGeneratedBuilderFactory);
     return '';
   }
 
-  ClassResult _getBody(ClassElement cls, LibraryElement targetLibrary,
-      ConstantReader annotation, ImportInfo fileInportInfo) {
+  ClassResult _getBody(
+    ClassElement cls,
+    LibraryElement targetLibrary,
+    ConstantReader annotation,
+    GeneratedBuilderFactory generatedBuilderFactory,
+  ) {
     // final currentReader = LibraryReader(currentLibrary);
     // final targetReader = LibraryReader(targetLibrary);
     // HashMap<String, ClassElement> currentClasses =
@@ -101,29 +105,42 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     //     _getMapElements(targetReader.classes);
     // List<ClassResult> results = [];
     // currentReader.classes.forEach((cls) {
-    ImportInfo currentClassInportInfo = StringUtils.getInportInfo(element: cls);
-    final currentGenerateBuilderFactory =
-        getGeneratedBuilderFactory(fileInportInfo.dirPath)!;
+    ImportInfo fileInportInfo = StringUtils.getImportInfo(element: cls);
     final generatedBuilderObject = GeneratedBuilderObject(
-        name: cls.name, mapperClassName: StringUtils.getMapperClass(cls.name));
-    currentGenerateBuilderFactory.objects.add(generatedBuilderObject);
+        name: cls.name,
+        mapperClassName: StringUtils.getMapperClassName(cls.name));
+    generatedBuilderFactory.objects.add(generatedBuilderObject);
     generatedBuilderObject.importInfo = ImportInfoManager.instance.getInfoFor(
       builderFunc: builderFunc,
       name: cls.name,
-      defaultImportInfo: currentClassInportInfo,
+      defaultImportInfo: fileInportInfo,
     );
-    generatedBuilderObject.mapperImportInfo = ImportInfoManager.instance.getInfoFor(
+    int length = ImportInfoManager.instance.importInfos.length;
+    generatedBuilderObject.mapperImportInfo =
+        ImportInfoManager.instance.getInfoFor(
       builderFunc: builderFunc,
       name: generatedBuilderObject.mapperClassName,
-      defaultImportInfo: currentClassInportInfo.cloneToMapper(),
+      defaultImportInfo: fileInportInfo.cloneToMapper(),
     );
-    return _getClassResult(cls, null);
+    appLog([
+      'ImportInfoManager.instance',
+      length,
+      ImportInfoManager.instance.importInfos.length,
+      generatedBuilderObject.mapperClassName,
+      "=======™"
+    ]);
+    appLog([
+      'generatedBuilderObject.mapperImportInfo',
+      generatedBuilderObject.mapperImportInfo?.import
+    ]);
+    return _getClassResult(cls, null, generatedBuilderFactory);
   }
 
-  ClassResult _getClassResult(ClassElement cls, ClassElement? targetClass) {
+  ClassResult _getClassResult(ClassElement cls, ClassElement? targetClass,
+      GeneratedBuilderFactory generatedBuilderFactory) {
     StringBuffer sb = StringBuffer();
     final dtoClass = StringUtils.getDTOClass(cls.name);
-    final mapperClass = StringUtils.getMapperClass(cls.name);
+    final mapperClass = StringUtils.getMapperClassName(cls.name);
     final domainClass = '${cls.name}';
     sb.writeln('class ${mapperClass}{');
     sb.writeln('  static ${domainClass}? $fromDTO($dtoClass? ${dtoObject}){');
@@ -136,7 +153,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     // Set<String> targetKeys = Set.from(targetFields.keys);
     // currentFields.removeWhere((key, value) => !targetKeys.contains(key));
     currentFields.forEach((key, field) {
-      final result = _getFieldDeclare(field);
+      final result = _getFieldDeclare(field,generatedBuilderFactory);
       if (result != null) {
         imports.addAll(result.imports);
         sb.writeln(result.body);
@@ -161,23 +178,29 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     return result;
   }
 
-  ClassResult? _getFieldDeclare(FieldElement field) {
+  ClassResult? _getFieldDeclare(
+      FieldElement field, GeneratedBuilderFactory generatedBuilderFactory) {
     ClassResult? result;
     if (field.type.isDartCoreList) {
       result = _getClassTextForList(
-          type: field.type as InterfaceType, varName: field.name);
+          type: field.type as InterfaceType, varName: field.name,generatedBuilderFactory: generatedBuilderFactory);
       if (result?.body.isNotEmpty == true) {
         result?.body += ';';
       }
     } else if (field.type.element != null) {
       result = _getClassResultForNotIterator(
-          field: field.type.element!, varName: field.name);
+          field: field.type.element!,
+          varName: field.name,
+          generatedBuilderFactory: generatedBuilderFactory);
     }
     return result;
   }
 
   ClassResult _getClassResultForNotIterator(
-      {required Element field, required String varName, String? obj}) {
+      {required Element field,
+      required String varName,
+      String? obj,
+      required GeneratedBuilderFactory generatedBuilderFactory}) {
     final dtoObject = obj ?? StringUtils.dtoObject;
     ClassResult result = ClassResult();
     final name = field.name ?? '';
@@ -187,17 +210,22 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     } else {
       result.body =
           '    ${newObj}.${varName} = ${_getClassNameFromType(field.name)}Mapper.$fromDTO(${dtoObject}.${varName});';
-      // result.imports.add(StringUtils.getImportForElement(element: field)
-      //     .replaceAll('.dart', '.mapper.dart'));
+      generatedBuilderFactory.objects
+          .add(ImportInfoManager.instance.getGeneratedBuilderObjectFromImport(
+        importText: StringUtils.getImportInfo(element: field).import!,
+        name: name,
+      ));
     }
     return result;
   }
 
   ClassResult _getClassResultForIterator(
-      {required Element field, required String varName}) {
+      {required Element field,
+      required String varName,
+      required GeneratedBuilderFactory generatedBuilderFactory}) {
     ClassResult result = ClassResult();
     final name = field.name ?? '';
-    final isGenModels = (isGenModelsClass(field));
+    final isGenModels = isGenModelsClass(field);
     if (AppValues.nativeTypes.contains(name) || !isGenModels) {
       result.body = varName;
     } else {
@@ -206,27 +234,45 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
             '${_getClassNameFromType(field.name)}Mapper.$fromDTO(${varName})!';
         // result.imports.add(StringUtils.getImportForElement(element: field)
         //     .replaceAll('.dart', '.mapper.dart'));
+        generatedBuilderFactory.objects
+            .add(ImportInfoManager.instance.getGeneratedBuilderObjectFromImport(
+          importText: StringUtils.getImportInfo(element: field).import!,
+          name: name,
+        ));
       }
     }
     return result;
   }
 
   ClassResult? _getClassTextForList(
-      {required InterfaceType type, required String varName, String? obj}) {
+      {required InterfaceType type,
+      required String varName,
+      String? obj,
+      required GeneratedBuilderFactory generatedBuilderFactory}) {
     StringBuffer sb = StringBuffer();
     final first = type.typeArguments.firstOrNull;
     ClassResult? result = ClassResult();
     if (first == null) {
+      generatedBuilderFactory.objects
+          .add(ImportInfoManager.instance.getGeneratedBuilderObjectFromImport(
+        importText: StringUtils.getImportInfo(element: type.element).import!,
+        name: type.element.name,
+      ));
       return _getClassResultForIterator(
-          field: type.element, varName: 'element');
+          field: type.element,
+          varName: 'element',
+          generatedBuilderFactory: generatedBuilderFactory);
     } else if (first is InterfaceType) {
-      result =
-          _getClassTextForList(type: first, varName: varName, obj: 'element');
+      result = _getClassTextForList(
+          type: first,
+          varName: varName,
+          obj: 'element',
+          generatedBuilderFactory: generatedBuilderFactory);
     } else {
       result = _getClassResultForIterator(
-        field: type.element,
-        varName: 'element',
-      );
+          field: type.element,
+          varName: 'element',
+          generatedBuilderFactory: generatedBuilderFactory);
     }
     if (result != null) {
       sb.writeln(
@@ -274,7 +320,9 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
 class ClassResult {
   List<String> imports;
   String body;
+  GeneratedBuilderObject? generatedBuilderObject;
 
-  ClassResult({List<String>? imports, this.body = ''})
+  ClassResult(
+      {List<String>? imports, this.body = '', this.generatedBuilderObject})
       : imports = imports ?? [];
 }

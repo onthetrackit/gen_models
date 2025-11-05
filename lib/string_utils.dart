@@ -26,7 +26,7 @@ class StringUtils {
     return '';
   }
 
-  static String getMapperClass(String className) {
+  static String getMapperClassName(String className) {
     return '${className}Mapper';
   }
 
@@ -89,10 +89,11 @@ class StringUtils {
         null;
   }
 
-  static ImportInfo getInportInfo({Element? element}) {
-    if (element == null) appLog([' if(element==null)']);
+  static ImportInfo getImportInfo({Element? element, String? import}) {
+    assert(!(element != null && import != null));
     ImportInfo importInfo = ImportInfo();
-    String path = element?.location?.components
+    String path = import ??
+        element?.location?.components
             .where(
               (element) => element.isNotEmpty == true,
             )
@@ -110,8 +111,6 @@ class StringUtils {
   }
 
   static String getMapperPath(String path) {
-    print(
-        'getMapperPath:${path}====${path.replaceAll(RegExp('.dart\$'), '.mapper.dart')}');
     return path.replaceAll(RegExp(r'.dart$'), '.mapper.dart');
   }
 
@@ -144,7 +143,6 @@ class StringUtils {
           package = path.substring(0, index);
           path = path.substring(index);
         }
-        print('path ${path}===${package}');
         path = path.replaceAll(RegExp('^${domainDir}'), dataDir!);
         if (index != -1) {
           path = '$package$path';

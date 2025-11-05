@@ -31,8 +31,7 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
   Set<String> classNames = Set();
   Set<String> mapperClassNames = Set();
 
-  GenModelsBuilder(
-    Generator generator, {
+  GenModelsBuilder(Generator generator, {
     String Function(String code)? formatOutput,
     String generatedExtension = '.g.dart',
     List<String> additionalOutputExtensions = const [],
@@ -40,19 +39,20 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     bool allowSyntaxErrors = false,
     BuilderOptions? options,
   }) : super(
-          generator,
-          formatOutput: formatOutput,
-          generatedExtension: generatedExtension,
-          additionalOutputExtensions: additionalOutputExtensions,
-          header: header,
-          allowSyntaxErrors: allowSyntaxErrors,
-          options: options,
-        ) {
+    generator,
+    formatOutput: formatOutput,
+    generatedExtension: generatedExtension,
+    additionalOutputExtensions: additionalOutputExtensions,
+    header: header,
+    allowSyntaxErrors: allowSyntaxErrors,
+    options: options,
+  ) {
     this.options = options;
     dataDir ??= options?.config[BuildOptionKeys.dataDir];
     domainDir ??= options?.config[BuildOptionKeys.domainDir];
     this.generator = generator as GenModelsGenerator;
     this.generator.builderFunc = this;
+    ImportInfoManager.instance.builderFunc = this;
   }
 
   @override
@@ -106,8 +106,8 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     if (generateBuilderFactory.bodies.isNotEmpty) {
       _writeFile(buildStep: buildStep, content: '''
   ${ImportInfoManager.instance.importInfos.map(
-                (e) => e.getImportPrefix(),
-              ).join('\n')}
+            (e) => e.getImportPrefix(),
+      ).join('\n')}
   ${generateBuilderFactory.bodies.join('\n\n')}
     ''');
     }
@@ -132,15 +132,19 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     String imports = ImportInfoManager.instance.importInfos
         .map(
           (e) => e.getImportPrefix(),
-        )
+    )
         .join('\n');
-  imports="import 'package:gen_models/mapper_factory.dart';\n${imports}";
+    imports = "import 'package:gen_models/mapper_factory.dart';\n${imports}";
     final funcs = generateBuilderFactory.objects.map((element) {
-          if (element.name?.isNotEmpty == true) {
-            String className = element.name ?? '';
-            return 'MapperData(name:"${element.name}",prefixName: "${StringUtils.addPrefixAndSuffix(text: element.importInfo?.prefix, suffix: '.')}${className}", func: ${StringUtils.addPrefixAndSuffix(text: element.mapperImportInfo?.prefix, suffix: '.')}${element.mapperClassName}.fromDTO)';
-          }
-        }).join(',\n') +
+      if (element.name?.isNotEmpty == true) {
+        String className = element.name ?? '';
+        return 'MapperData(name:"${element.name}",prefixName: "${StringUtils
+            .addPrefixAndSuffix(text: element.importInfo?.prefix,
+            suffix: '.')}${className}", func: ${StringUtils.addPrefixAndSuffix(
+            text: element.mapperImportInfo?.prefix, suffix: '.')}${element
+            .mapperClassName}.fromDTO)';
+      }
+    }).join(',\n') +
         ',';
     content = '$imports\n${content.substring(content.indexOf(markHeader))}';
     content = content.replaceAll(
@@ -168,24 +172,23 @@ class GeneratedBuilderFactory {
 
   List<GeneratedBuilderObject> get objects => _objects;
   List<String> bodies;
-  String? prefix;
   String path;
 
   addObject(GeneratedBuilderObject obj) {
     _objects.add(obj);
   }
 
-  GeneratedBuilderFactory(
-      {List<GeneratedBuilderObject>? objects,
-      List<ImportInfo>? importInfos,
-      List<String>? bodies,
-      String? prefix,
-      String? path,
-      String? mapperClassName,
-      String? mapperPrefix})
+  GeneratedBuilderFactory({List<GeneratedBuilderObject>? objects,
+    List<ImportInfo>? importInfos,
+    List<String>? bodies,
+    String? prefix,
+    String? path,
+    String? mapperClassName,
+    String? mapperPrefix})
       : path = path ?? '',
         _objects = objects ?? [],
-        bodies = bodies ?? [];
+        bodies = bodies ?? [] {
+  }
 }
 
 class GeneratedBuilderObject {
