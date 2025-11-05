@@ -93,12 +93,14 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
       generateBuilderFactory.objects.length,
     ]);
     _generateContent();
-    _writeFile(buildStep: buildStep, content: '''
+    if(generateBuilderFactory.bodies.isNotEmpty) {
+      _writeFile(buildStep: buildStep, content: '''
   ${generateBuilderFactory.objectImportInfos.map(
-              (e) => e.import,
-            ).join('\n')}
+                (e) => e.getImportPrefix(),
+              ).join('\n')}
   ${generateBuilderFactory.bodies.join('\n\n')}
     ''');
+    }
     return result;
   }
 

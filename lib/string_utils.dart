@@ -147,7 +147,7 @@ appLog(List params,{String? prefix,String? suffix}){
   if(prefix?.isNotEmpty==true){
     print(prefix);
   }
-  print(params.map((e) => e.toString(),).join(','));
+  print(params.map((e) => e.toString(),).join('\n'));
   if(suffix?.isNotEmpty==true){
     print(suffix);
   }

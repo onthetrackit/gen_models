@@ -45,20 +45,12 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     currentInportInfo.prefix = currentGenerateBuilderFactory.prefix;
     path = StringUtils.getPath(element, isRemovePackage: true);
     List<String> imports = _getImports(element.library!);
-    // if (!pathBuilded.contains(currentInportInfo.import)) {
-    //   currentGenerateBuilderFactory
-    //       .addAllImportInfo(_getImports(element.library!)
-    //           .map(
-    //             (e) => ImportInfo(import: e),
-    //           )
-    //           .toList());
-    //   pathBuilded.add(currentInportInfo.import!);
-    // }
     imports.add(StringUtils.getImportForElement(element: element));
-    imports.add(currentInportInfo.getMapperImport(
-        prefix: currentGenerateBuilderFactory.prefix));
-    imports.add(
-        currentInportInfo.getMapperImport(prefix: builderFunc.getPrefix()));
+    imports.add(StringUtils.getImportForElement(element: element));
+    // imports.add(currentInportInfo.getMapperImport(
+    //     prefix: currentGenerateBuilderFactory.prefix));
+    // imports.add(
+    //     currentInportInfo.getMapperImport(prefix: builderFunc.getPrefix()));
     final dtoPath = StringUtils.getDTOPath(
         element: element,
         annotation: annotation,
@@ -75,6 +67,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     bodies.add(classes.body);
     imports = imports.toSet().toList();
     imports.sort();
+    appLog(imports,prefix: '======--');
     currentGenerateBuilderFactory.bodies.addAll(bodies);
     currentGenerateBuilderFactory.addAllImportInfo(imports
         .map(
