@@ -28,7 +28,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
 
   String? dataDir;
   String? domainDir;
-  late GeneratedBuilderFactory currentGenerateBuilderFactory;
+  late Map<String, GeneratedBuilderFactory> mapGenerateBuilderFactory;
   late ImportInfo currentInportInfo;
   Set<String> pathBuilded = Set();
 
@@ -37,11 +37,25 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     domainDir ??= options?.config[BuildOptionKeys.domainDir];
   }
 
+  GeneratedBuilderFactory? getGeneratedBuilderFactory(String? path) =>
+      mapGenerateBuilderFactory['lib/${path}'];
+
   @override
   Future<String?> generateForAnnotatedElement(
       Element element, ConstantReader annotation, BuildStep buildStep) async {
     currentInportInfo = StringUtils.getInportInfo(element: element);
-    if(currentGenerateBuilderFactory.prefix?.isNotEmpty!=true) {
+    if (!StringUtils.checkFileName(currentInportInfo.dirPath ?? '')) return '';
+    // appLog([
+    //   'generateForAnnotatedElement1',
+    //   currentInportInfo.dirPath,
+    //   currentInportInfo.import
+    // ]);
+    // appLog(['map', ...mapGenerateBuilderFactory.keys.toList()]);
+    final currentGenerateBuilderFactory =
+        getGeneratedBuilderFactory(currentInportInfo.dirPath);
+    if (currentGenerateBuilderFactory == null) return '';
+    // appLog(['generateForAnnotatedElement1', currentInportInfo.dirPath]);
+    if (currentGenerateBuilderFactory.prefix?.isNotEmpty != true) {
       currentGenerateBuilderFactory.prefix = builderFunc.getPrefix();
     }
     currentInportInfo.prefix = currentGenerateBuilderFactory.prefix;
@@ -89,6 +103,9 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     //     _getMapElements(targetReader.classes);
     // List<ClassResult> results = [];
     // currentReader.classes.forEach((cls) {
+    currentInportInfo = StringUtils.getInportInfo(element: cls);
+    final currentGenerateBuilderFactory =
+        getGeneratedBuilderFactory(currentInportInfo.dirPath)!;
     final generatedBuilderObject = GeneratedBuilderObject(
         name: cls.name,
         prefix: currentGenerateBuilderFactory.prefix,
@@ -118,7 +135,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
           importInfo.prefix = currentGenerateBuilderFactory.prefix;
         }
         currentGenerateBuilderFactory.addImportInfo(importInfo);
-        currentGenerateBuilderFactory.objects.add(generatedBuilderObject);
       }
     }
     //todo check null targetClasses[cls.name]

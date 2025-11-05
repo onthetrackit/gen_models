@@ -81,7 +81,16 @@ class StringUtils {
     return '';
   }
 
+  static bool checkFileName(String path) {
+    List<String> notAllowed = ['.g.dart', '.mapper.dart', 'dto.dart'];
+    return notAllowed.firstWhereOrNull(
+          (element) => path.toLowerCase().endsWith(element),
+        ) ==
+        null;
+  }
+
   static ImportInfo getInportInfo({Element? element}) {
+    if (element == null) appLog([' if(element==null)']);
     ImportInfo importInfo = ImportInfo();
     String path = element?.location?.components
             .where(
@@ -101,12 +110,14 @@ class StringUtils {
   }
 
   static String getMapperPath(String path) {
-    print('getMapperPath:${path}====${path.replaceAll(RegExp('.dart\$'), '.mapper.dart')}');
+    print(
+        'getMapperPath:${path}====${path.replaceAll(RegExp('.dart\$'), '.mapper.dart')}');
     return path.replaceAll(RegExp(r'.dart$'), '.mapper.dart');
   }
 
-  static String getImportForElement({Element? element, String? path,bool isAddSemicolon=true}) {
-    return "import '${path ?? StringUtils.getPath(element)}'${isAddSemicolon?';':''}";
+  static String getImportForElement(
+      {Element? element, String? path, bool isAddSemicolon = true}) {
+    return "import '${path ?? StringUtils.getPath(element)}'${isAddSemicolon ? ';' : ''}";
   }
 
   static String getDTOPath(
@@ -143,12 +154,17 @@ class StringUtils {
     return StringUtils.addDtoToFilePath(path);
   }
 }
-appLog(List params,{String? prefix,String? suffix}){
-  if(prefix?.isNotEmpty==true){
+
+appLog(List params, {String? prefix, String? suffix}) {
+  if (prefix?.isNotEmpty == true) {
     print(prefix);
   }
-  print(params.map((e) => e.toString(),).join('\n'));
-  if(suffix?.isNotEmpty==true){
+  print(params
+      .map(
+        (e) => e.toString(),
+      )
+      .join('\n'));
+  if (suffix?.isNotEmpty == true) {
     print(suffix);
   }
 }

@@ -14,6 +14,7 @@ import '../generator.dart';
 final String markHeader = '//__markHeader__';
 final String markBody = '//__markBody__';
 final String fileSeparator = '//__start file__';
+
 class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
   int _importCount = 0;
   late GenModelsGenerator generator;
@@ -21,7 +22,7 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
   // List<String> _imports = [];
   // List<String> _funcs = [];
   Set<String> allClassName = Set();
-  late GeneratedBuilderFactory generateBuilderFactory;
+  late Map<String, GeneratedBuilderFactory> mapGenerateBuilderFactory={};
   final filePath = 'build/fake.mapper.dart';
   final split = '//=============';
   BuilderOptions? options;
@@ -60,13 +61,13 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
   };
 
   @override
-  void onDetectedClassPaths({required GeneratedBuilderFactory data}) {
-    generateBuilderFactory = data;
-  }
+  void onDetectedClassPaths({required GeneratedBuilderFactory data}) {}
 
   @override
   bool checkDuplicateClassName(String className) {
-    return classNames.contains(className);
+    final isContain = classNames.contains(className);
+    classNames.add(className);
+    return isContain;
   }
 
   @override
@@ -76,13 +77,25 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
 
   int count = 0;
 
+  String getBuildStepPath(BuildStep buildStep) {
+    String path = buildStep.inputId.path;
+    return path;
+  }
+
+  GeneratedBuilderFactory? getBuildStepGenerated(BuildStep buildStep) {
+    String path = getBuildStepPath(buildStep);
+    return mapGenerateBuilderFactory[path];
+  }
+
   @override
   Future<void> build(BuildStep buildStep) async {
     count++;
-    generateBuilderFactory = GeneratedBuilderFactory();
-    generator.currentGenerateBuilderFactory = generateBuilderFactory;
+    String path = getBuildStepPath(buildStep);
+    final generateBuilderFactory = GeneratedBuilderFactory();
+    mapGenerateBuilderFactory[path] = generateBuilderFactory;
+    generator.mapGenerateBuilderFactory = mapGenerateBuilderFactory;
     final result = await super.build(buildStep);
-    if(generateBuilderFactory.bodies.isNotEmpty) {
+    if (generateBuilderFactory.bodies.isNotEmpty) {
       _writeFile(buildStep: buildStep, content: '''
   ${generateBuilderFactory.objectImportInfos.map(
                 (e) => e.getImportPrefix(),
@@ -90,9 +103,16 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
   ${generateBuilderFactory.bodies.join('\n\n')}
     ''');
     }
-    _genMapperFile(buildStep);
+    generateBuilderFactory.path = buildStep.inputId.path;
+    if (generateBuilderFactory.objects.isNotEmpty &&
+        StringUtils.checkFileName(generateBuilderFactory.path)) {
+      _genMapperFile(buildStep);
+    }
     return result;
   }
+
+
+
   _genMapperFile(BuildStep buildStep) async {
     File indexFile = File('lib/mapper_generated.mapper.dart');
     MapperData a;
@@ -101,10 +121,12 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
       content = indexFile.readAsStringSync();
       indexFile.deleteSync();
     }
+    final generateBuilderFactory=getBuildStepGenerated(buildStep);
+    if(generateBuilderFactory==null) return;
     final imports = generateBuilderFactory.objectImportInfos
         .map(
           (e) => e.getImportPrefix(),
-    )
+        )
         .join('\n');
 
     final funcs = generateBuilderFactory.objects.map((element) {
@@ -112,12 +134,15 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
         String className = element.name ?? '';
         return 'MapperData(name:"${element.name}",prefixName: "${StringUtils.addPrefixAndSuffix(text: element.prefix, suffix: '.')}${className}", func: ${StringUtils.addPrefixAndSuffix(text: element.mapperPrefix, suffix: '.')}${element.mapperClassName}.fromDTO)';
       }
-    }).join(',\n');
+    }).join(',\n')+',';
+
     content = content
         .replaceAll(markHeader, '${imports}\n${markHeader}')
-        .replaceAll(markBody, '${funcs}\n${markBody}');
+        .replaceAll(markBody,
+            '${funcs}\n//${generateBuilderFactory.path}\n${markBody}');
     indexFile.writeAsStringSync(content, mode: FileMode.write);
   }
+
   _writeFile({String content = '', required BuildStep buildStep}) async {
     final outputId = AssetId(buildStep.inputId.package,
         StringUtils.getMapperPath(buildStep.inputId.path));
@@ -133,11 +158,17 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
 }
 
 class GeneratedBuilderFactory {
-  List<GeneratedBuilderObject> objects;
+  List<GeneratedBuilderObject> _objects;
+
+  List<GeneratedBuilderObject> get objects => _objects;
   List<ImportInfo> objectImportInfos;
   List<String> bodies;
   String? prefix;
   String path;
+
+  addObject(GeneratedBuilderObject obj) {
+    _objects.add(obj);
+  }
 
   addImportInfo(ImportInfo importInfo) {
     if (!hasImport(importInfo)) {
@@ -179,7 +210,7 @@ class GeneratedBuilderFactory {
       String? mapperPrefix})
       : objectImportInfos = importInfos ?? [],
         path = path ?? '',
-        objects = objects ?? [],
+        _objects = objects ?? [],
         bodies = bodies ?? [];
 }
 
@@ -198,8 +229,6 @@ class GeneratedBuilderObject {
         mapperClassName = mapperClassName ?? '',
         mapperPrefix = mapperPrefix ?? '';
 }
-
-
 
 String _fileContent = '''
 import 'package:gen_models/mapper_factory.dart';
