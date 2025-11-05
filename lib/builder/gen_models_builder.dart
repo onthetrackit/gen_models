@@ -75,7 +75,7 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     appLog(['params12', _imports.length, _funcs.length]);
     return GenModelsBuilderOutput(
         imports: _imports.join('\n'),
-        funcs: _funcs.join('\n'),
+        funcs: _funcs.join(',\n'),
         path: buildStep.inputId.path);
   }
 
@@ -87,11 +87,6 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     generateBuilderFactory = GeneratedBuilderFactory();
     generator.currentGenerateBuilderFactory = generateBuilderFactory;
     final result = await super.build(buildStep);
-    appLog([
-      'generateBuilderFactory',
-      generateBuilderFactory.objectImportInfos.length,
-      generateBuilderFactory.objects.length,
-    ]);
     _generateContent();
     if(generateBuilderFactory.bodies.isNotEmpty) {
       _writeFile(buildStep: buildStep, content: '''
@@ -150,7 +145,7 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
         if (element.name?.isNotEmpty == true) {
           String className = element.name ?? '';
           _funcs.add(
-            '//MapperData(type: "${StringUtils.addPrefixAndSuffix(text: element.prefix, suffix: '.')}${className}", func: ${StringUtils.addPrefixAndSuffix(text: element.mapperPrefix, suffix: '.')}${element.mapperClassName}.fromDTO)',
+            'MapperData(type: "${StringUtils.addPrefixAndSuffix(text: element.prefix, suffix: '.')}${className}", func: ${StringUtils.addPrefixAndSuffix(text: element.mapperPrefix, suffix: '.')}${element.mapperClassName}.fromDTO)',
           );
         }
       },
