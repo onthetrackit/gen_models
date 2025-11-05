@@ -26,13 +26,6 @@ class ImportInfoManager {
     if (!hasImport(importInfo)) {
       importInfos.add(importInfo);
     }
-    // if (hasImport(importInfo)) {
-    //   //todo remove
-    //   importInfos.removeWhere(
-    //         (element) => element.import == importInfo.import,
-    //   );
-    // }
-    // importInfos.add(importInfo);
   }
 
   addAllImportInfo(List<ImportInfo> importInfos) {
@@ -47,25 +40,21 @@ class ImportInfoManager {
     if (import?.isNotEmpty != true) {
       return null;
     }
-    return importInfos.firstWhereOrNull(
-      (element) =>
-          element.import == import &&
-          (!isForDuplicate || element.prefix?.isNotEmpty == true),
-    );
+    return importInfos.firstWhereOrNull((element) => element.import == import);
   }
 
   hasImport(ImportInfo importInfo) {
     return importInfos.firstWhereOrNull((element) =>
             element.import == importInfo.import &&
-            element.prefix == importInfo.prefix) !=
+            (element.prefix == importInfo.prefix ||
+                (element.prefix?.isNotEmpty == true &&
+                    importInfo.prefix?.isNotEmpty == true))) !=
         null;
   }
 
   GeneratedBuilderObject getGeneratedBuilderObjectFromImport(
-      {required String importText,
-      required String name,
-      String? mapperName}) {
-    mapperName??=StringUtils.getMapperClassName(name);
+      {required String importText, required String name, String? mapperName}) {
+    mapperName ??= StringUtils.getMapperClassName(name);
     final import = StringUtils.getImportInfo(import: importText);
     GeneratedBuilderObject result = GeneratedBuilderObject();
     result.name = name;
@@ -93,11 +82,12 @@ class ImportInfoManager {
       if (addedImport != null) {
         result = addedImport;
       } else {
-        result.prefix = builderFunc.getPrefix();
         addImportInfo(result);
       }
+      result.prefix ??= builderFunc.getPrefix();
       return result;
     }
+    defaultImportInfo.prefix ??= builderFunc.getPrefix();
     addImportInfo(defaultImportInfo);
     return defaultImportInfo;
   }

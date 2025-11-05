@@ -45,6 +45,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
       Element element, ConstantReader annotation, BuildStep buildStep) async {
     ImportInfo currentImportInfo = StringUtils.getImportInfo(element: element);
     if (!StringUtils.checkFileName(currentImportInfo.dirPath ?? '')) return '';
+    currentImportInfo.prefix ??= builderFunc.getPrefix();
     final currentGeneratedBuilderFactory =
         getGeneratedBuilderFactory(currentImportInfo.dirPath);
     if (currentGeneratedBuilderFactory == null) return '';
@@ -86,7 +87,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
           (e) => ImportInfo(import: e),
         )
         .toList());
-    ImportInfoManager.instance.addImportInfo(currentImportInfo);
     builderFunc.onDetectedClassPaths(data: currentGeneratedBuilderFactory);
     return '';
   }
@@ -115,24 +115,12 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
       name: cls.name,
       defaultImportInfo: fileInportInfo,
     );
-    int length = ImportInfoManager.instance.importInfos.length;
     generatedBuilderObject.mapperImportInfo =
         ImportInfoManager.instance.getInfoFor(
       builderFunc: builderFunc,
       name: generatedBuilderObject.mapperClassName,
       defaultImportInfo: fileInportInfo.cloneToMapper(),
     );
-    appLog([
-      'ImportInfoManager.instance',
-      length,
-      ImportInfoManager.instance.importInfos.length,
-      generatedBuilderObject.mapperClassName,
-      "=======™"
-    ]);
-    appLog([
-      'generatedBuilderObject.mapperImportInfo',
-      generatedBuilderObject.mapperImportInfo?.import
-    ]);
     return _getClassResult(cls, null, generatedBuilderFactory);
   }
 
@@ -153,7 +141,7 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     // Set<String> targetKeys = Set.from(targetFields.keys);
     // currentFields.removeWhere((key, value) => !targetKeys.contains(key));
     currentFields.forEach((key, field) {
-      final result = _getFieldDeclare(field,generatedBuilderFactory);
+      final result = _getFieldDeclare(field, generatedBuilderFactory);
       if (result != null) {
         imports.addAll(result.imports);
         sb.writeln(result.body);
@@ -183,7 +171,9 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     ClassResult? result;
     if (field.type.isDartCoreList) {
       result = _getClassTextForList(
-          type: field.type as InterfaceType, varName: field.name,generatedBuilderFactory: generatedBuilderFactory);
+          type: field.type as InterfaceType,
+          varName: field.name,
+          generatedBuilderFactory: generatedBuilderFactory);
       if (result?.body.isNotEmpty == true) {
         result?.body += ';';
       }
