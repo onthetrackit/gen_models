@@ -22,7 +22,7 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
   // List<String> _imports = [];
   // List<String> _funcs = [];
   Set<String> allClassName = Set();
-  late Map<String, GeneratedBuilderFactory> mapGenerateBuilderFactory={};
+  late Map<String, GeneratedBuilderFactory> mapGenerateBuilderFactory = {};
   final filePath = 'build/fake.mapper.dart';
   final split = '//=============';
   BuilderOptions? options;
@@ -70,6 +70,7 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     classNames.add(className);
     return isContain;
   }
+
   @override
   bool checkAndAddDuplicateMapperClassName(String className) {
     final isContain = mapperClassNames.contains(className);
@@ -104,7 +105,7 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     final result = await super.build(buildStep);
     if (generateBuilderFactory.bodies.isNotEmpty) {
       _writeFile(buildStep: buildStep, content: '''
-  ${generateBuilderFactory.objectImportInfos.map(
+  ${ImportInfoManager.instance.importInfos.map(
                 (e) => e.getImportPrefix(),
               ).join('\n')}
   ${generateBuilderFactory.bodies.join('\n\n')}
@@ -118,33 +119,32 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
     return result;
   }
 
-
-
   _genMapperFile(BuildStep buildStep) async {
     File indexFile = File('lib/mapper_generated.mapper.dart');
-    MapperData a;
     String content = _fileContent;
     if (indexFile.existsSync()) {
       content = indexFile.readAsStringSync();
       indexFile.deleteSync();
     }
-    final generateBuilderFactory=getBuildStepGenerated(buildStep);
-    if(generateBuilderFactory==null) return;
-    final imports = generateBuilderFactory.objectImportInfos
+    ImportInfoManager.instance.sort();
+    final generateBuilderFactory = getBuildStepGenerated(buildStep);
+    if (generateBuilderFactory == null) return;
+    final imports = ImportInfoManager.instance.importInfos
         .map(
           (e) => e.getImportPrefix(),
         )
         .join('\n');
 
     final funcs = generateBuilderFactory.objects.map((element) {
-      if (element.name?.isNotEmpty == true) {
-        String className = element.name ?? '';
-        return 'MapperData(name:"${element.name}",prefixName: "${StringUtils.addPrefixAndSuffix(text: element.prefix, suffix: '.')}${className}", func: ${StringUtils.addPrefixAndSuffix(text: element.mapperPrefix, suffix: '.')}${element.mapperClassName}.fromDTO)';
-      }
-    }).join(',\n')+',';
-
+          if (element.name?.isNotEmpty == true) {
+            String className = element.name ?? '';
+            return 'MapperData(name:"${element.name}",prefixName: "${StringUtils.addPrefixAndSuffix(text: element.importInfo?.prefix, suffix: '.')}${className}", func: ${StringUtils.addPrefixAndSuffix(text: element.importInfo?.mapperPrefix, suffix: '.')}${element.mapperClassName}.fromDTO)';
+          }
+        }).join(',\n') +
+        ',';
+    content='$imports\n${content.substring(content
+        .indexOf(markHeader))}';
     content = content
-        .replaceAll(markHeader, '${imports}\n${markHeader}')
         .replaceAll(markBody,
             '${funcs}\n//${generateBuilderFactory.path}\n${markBody}');
     indexFile.writeAsStringSync(content, mode: FileMode.write);
@@ -163,26 +163,30 @@ class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
 //   return '';
 // }
 }
-class ImportInfoManager{
 
-}
-class GeneratedBuilderFactory {
-  List<GeneratedBuilderObject> _objects;
+class ImportInfoManager {
+  static ImportInfoManager _instance = ImportInfoManager._private();
 
-  List<GeneratedBuilderObject> get objects => _objects;
-  List<String> bodies;
-  String? prefix;
-  String path;
-  List<ImportInfo> objectImportInfos;
+  static ImportInfoManager get instance => _instance;
 
-  addObject(GeneratedBuilderObject obj) {
-    _objects.add(obj);
+  ImportInfoManager._private();
+
+  List<ImportInfo> importInfos = [];
+  sort(){
+    importInfos.sort((a, b) => a.import!.compareTo(b.import!),);
   }
-
   addImportInfo(ImportInfo importInfo) {
-    if (!hasImport(importInfo)) {
-      objectImportInfos.add(importInfo);
+    // if (!hasImport(importInfo)) {
+    //   //todo remove
+    //   importInfos.add(importInfo);
+    // }
+
+    if (hasImport(importInfo)) {
+      //todo remove
+      importInfos.removeWhere((element) => element.import == importInfo.import,);
+
     }
+    importInfos.add(importInfo);
   }
 
   addAllImportInfo(List<ImportInfo> importInfos) {
@@ -197,16 +201,29 @@ class GeneratedBuilderFactory {
     if (import?.isNotEmpty != true) {
       return null;
     }
-    return objectImportInfos.firstWhereOrNull(
+    return importInfos.firstWhereOrNull(
       (element) => element.import == import,
     );
   }
 
   hasImport(ImportInfo importInfo) {
-    return objectImportInfos.firstWhereOrNull(
+    return importInfos.firstWhereOrNull(
           (element) => element.import == importInfo.import,
         ) !=
         null;
+  }
+}
+
+class GeneratedBuilderFactory {
+  List<GeneratedBuilderObject> _objects;
+
+  List<GeneratedBuilderObject> get objects => _objects;
+  List<String> bodies;
+  String? prefix;
+  String path;
+
+  addObject(GeneratedBuilderObject obj) {
+    _objects.add(obj);
   }
 
   GeneratedBuilderFactory(
@@ -217,26 +234,18 @@ class GeneratedBuilderFactory {
       String? path,
       String? mapperClassName,
       String? mapperPrefix})
-      : objectImportInfos = importInfos ?? [],
-        path = path ?? '',
+      : path = path ?? '',
         _objects = objects ?? [],
         bodies = bodies ?? [];
 }
 
 class GeneratedBuilderObject {
   String? name;
-  String? prefix;
   String mapperClassName;
-  String mapperPrefix;
+  ImportInfo? importInfo;
 
-  GeneratedBuilderObject(
-      {this.name,
-      String? prefix,
-      String? mapperClassName,
-      String? mapperPrefix})
-      : prefix = prefix ?? '',
-        mapperClassName = mapperClassName ?? '',
-        mapperPrefix = mapperPrefix ?? '';
+  GeneratedBuilderObject({this.name, this.importInfo, String? mapperClassName})
+      : mapperClassName = mapperClassName ?? '';
 }
 
 String _fileContent = '''

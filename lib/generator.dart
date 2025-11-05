@@ -29,7 +29,6 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   String? dataDir;
   String? domainDir;
   late Map<String, GeneratedBuilderFactory> mapGenerateBuilderFactory;
-  late HashMap<String, ImportInfo> mapCurrentInportInfo=HashMap();
   Set<String> pathBuilded = Set();
 
   GenModelsGenerator({this.options}) {
@@ -40,33 +39,23 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
   GeneratedBuilderFactory? getGeneratedBuilderFactory(String? path) =>
       mapGenerateBuilderFactory['lib/${path}'];
 
-  ImportInfo? getImportInfo(String? path) =>
-      mapCurrentInportInfo['${path}'];
-
-  addImportInfo(String path, ImportInfo import) {
-    mapCurrentInportInfo['${path}'] = import;
-  }
-
   @override
   Future<String?> generateForAnnotatedElement(
       Element element, ConstantReader annotation, BuildStep buildStep) async {
-    final currentInportInfo = StringUtils.getInportInfo(element: element);
-    addImportInfo(currentInportInfo.dirPath!, currentInportInfo);
+    ImportInfo currentInportInfo = StringUtils.getInportInfo(element: element);
     if (!StringUtils.checkFileName(currentInportInfo.dirPath ?? '')) return '';
-    // appLog([
-    //   'generateForAnnotatedElement1',
-    //   currentInportInfo.dirPath,
-    //   currentInportInfo.import
-    // ]);
-    // appLog(['map', ...mapGenerateBuilderFactory.keys.toList()]);
     final currentGenerateBuilderFactory =
         getGeneratedBuilderFactory(currentInportInfo.dirPath);
     if (currentGenerateBuilderFactory == null) return '';
-    // appLog(['generateForAnnotatedElement1', currentInportInfo.dirPath]);
-    if (currentGenerateBuilderFactory.prefix?.isNotEmpty != true) {
-      currentGenerateBuilderFactory.prefix = builderFunc.getPrefix();
+    if (ImportInfoManager.instance.getImportInfo(currentInportInfo.import) != null) {
+      currentInportInfo = ImportInfoManager.instance.getImportInfo(currentInportInfo.import)!;
+    } else {
+      currentInportInfo.prefix = builderFunc.getPrefix();
+      currentInportInfo.mapperPrefix = builderFunc.getPrefix();
     }
-    currentInportInfo.prefix = currentGenerateBuilderFactory.prefix;
+    if (currentGenerateBuilderFactory.prefix?.isNotEmpty != true) {
+      currentGenerateBuilderFactory.prefix = currentInportInfo.prefix;
+    }
     path = StringUtils.getPath(element, isRemovePackage: true);
     List<String> imports = _getImports(element.library!);
     imports.add(StringUtils.getImportForElement(element: element));
@@ -82,27 +71,28 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
         domainDir: domainDir,
         dataDir: dataDir);
     if (dtoPath.isNotEmpty == true) {
-      imports.add("import '${dtoPath}';");
+      imports.add(dtoPath);
     }
-    final classes =
-        _getBody(element as ClassElement, element.library!, annotation);
+    final classes = _getBody(element as ClassElement, element.library!,
+        annotation, currentInportInfo);
     List<String> bodies = [];
     imports.addAll(classes.imports);
     bodies.add(classes.body);
     imports = imports.toSet().toList();
     imports.sort();
     currentGenerateBuilderFactory.bodies.addAll(bodies);
-    currentGenerateBuilderFactory.addAllImportInfo(imports
+    ImportInfoManager.instance.addAllImportInfo(imports
         .map(
           (e) => ImportInfo(import: e),
         )
         .toList());
+    ImportInfoManager.instance.addImportInfo(currentInportInfo);
     builderFunc.onDetectedClassPaths(data: currentGenerateBuilderFactory);
     return '';
   }
 
   ClassResult _getBody(ClassElement cls, LibraryElement targetLibrary,
-      ConstantReader annotation) {
+      ConstantReader annotation, ImportInfo fileInportInfo) {
     // final currentReader = LibraryReader(currentLibrary);
     // final targetReader = LibraryReader(targetLibrary);
     // HashMap<String, ClassElement> currentClasses =
@@ -111,42 +101,37 @@ class GenModelsGenerator extends GeneratorForAnnotation<GenModels> {
     //     _getMapElements(targetReader.classes);
     // List<ClassResult> results = [];
     // currentReader.classes.forEach((cls) {
-    ImportInfo currentInportInfo = StringUtils.getInportInfo(element: cls);
+    ImportInfo currentClassInportInfo = StringUtils.getInportInfo(element: cls);
     final currentGenerateBuilderFactory =
-        getGeneratedBuilderFactory(currentInportInfo.dirPath)!;
+        getGeneratedBuilderFactory(fileInportInfo.dirPath)!;
     final generatedBuilderObject = GeneratedBuilderObject(
-        name: cls.name,
-        prefix: currentGenerateBuilderFactory.prefix,
-        mapperClassName: StringUtils.getMapperClass(cls.name));
-    currentInportInfo=currentGenerateBuilderFactory.getImportInfo(currentInportInfo.import)!;
+        name: cls.name, mapperClassName: StringUtils.getMapperClass(cls.name));
     currentGenerateBuilderFactory.objects.add(generatedBuilderObject);
     final duplicate = builderFunc.checkAndAddDuplicateClassName(cls.name);
     final mapperDuplicate = builderFunc.checkAndAddDuplicateMapperClassName(
         generatedBuilderObject.mapperClassName);
-    if (duplicate || mapperDuplicate) {
-      var importInfo = StringUtils.getInportInfo(element: cls);
-      final addedImport =
-          currentGenerateBuilderFactory.getImportInfo(importInfo.import);
-      print('before check info:${importInfo.prefix}');
-      if (currentInportInfo.package != importInfo.package) {
+    generatedBuilderObject.importInfo = fileInportInfo;
+    if (duplicate) {
+      print('before check info:${fileInportInfo.prefix}');
+      ImportInfo result = fileInportInfo;
+      if (fileInportInfo.package != currentClassInportInfo.package) {
+        final addedImport =
+            ImportInfoManager.instance.getImportInfo(fileInportInfo.import);
         if (addedImport != null) {
-          importInfo = addedImport;
-          if (importInfo.prefix?.isNotEmpty != true) {
+          result = addedImport;
+          if (result.prefix?.isNotEmpty != true) {
             final prefix = builderFunc.getPrefix();
-            importInfo.prefix = prefix;
+            result.prefix = prefix;
           }
         } else {
-          generatedBuilderObject.prefix = currentGenerateBuilderFactory.prefix;
-          importInfo.prefix = currentGenerateBuilderFactory.prefix;
+          ImportInfoManager.instance.addImportInfo(result);
         }
-        currentGenerateBuilderFactory.addImportInfo(importInfo);
       }
-      print('check info:${importInfo.prefix}');
+      print('check info:${result.prefix}');
       if (mapperDuplicate) {
-        final prefix = builderFunc.getPrefix();
-        importInfo.mapperPrefix = prefix;
-        generatedBuilderObject.mapperPrefix = prefix;
+        result.mapperPrefix ??= builderFunc.getPrefix();
       }
+      generatedBuilderObject.importInfo = result;
     }
     //todo check null targetClasses[cls.name]
     return _getClassResult(cls, null);

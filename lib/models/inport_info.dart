@@ -19,7 +19,7 @@ class ImportInfo {
   }
 
   String getImportPrefix({String? prefix}) {
-    return '111=${prefix ?? this.prefix}=$import ${StringUtils.addPrefixAndSuffix(text: prefix ?? this.prefix, prefix: ' as ')}';
+    return '${StringUtils.getImportForElement(path:import??'',isAddSemicolon: false)} ${StringUtils.addPrefixAndSuffix(text: prefix ?? this.prefix, prefix: ' as ')}';
   }
 
   ImportInfo(
