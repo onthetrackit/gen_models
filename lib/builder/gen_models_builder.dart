@@ -1,17 +1,16 @@
-import 'dart:io';
-import 'dart:math';
-
 import 'package:build/build.dart';
+import 'package:gen_models/builder/builder_funcs.dart';
 import 'package:gen_models/constants/build_option_keys.dart';
+import 'package:gen_models/models/inport_info.dart';
+import 'package:gen_models/string_utils.dart';
 import 'package:source_gen/source_gen.dart';
 
 import '../generator.dart';
 
-class GenModelsBuilder extends LibraryBuilder {
+class GenModelsBuilder extends LibraryBuilder implements BuilderFunc {
   int _importCount = 0;
   late GenModelsGenerator generator;
 
-  String get _getImportPrefix => 'prefix${++_importCount}';
   List<String> _imports = [];
   List<String> _funcs = [];
   Set<String> allClassName = Set();
@@ -21,16 +20,16 @@ class GenModelsBuilder extends LibraryBuilder {
   BuilderOptions? options;
   String? dataDir;
   String? domainDir;
+  Set<String> classNames = Set();
 
-  GenModelsBuilder(
-      Generator generator, {
-        String Function(String code)? formatOutput,
-        String generatedExtension = '.g.dart',
-        List<String> additionalOutputExtensions = const [],
-        String? header,
-        bool allowSyntaxErrors = false,
-        BuilderOptions? options,
-      }) : super(
+  GenModelsBuilder(Generator generator, {
+    String Function(String code)? formatOutput,
+    String generatedExtension = '.g.dart',
+    List<String> additionalOutputExtensions = const [],
+    String? header,
+    bool allowSyntaxErrors = false,
+    BuilderOptions? options,
+  }) : super(
     generator,
     formatOutput: formatOutput,
     generatedExtension: generatedExtension,
@@ -43,6 +42,7 @@ class GenModelsBuilder extends LibraryBuilder {
     dataDir ??= options?.config[BuildOptionKeys.dataDir];
     domainDir ??= options?.config[BuildOptionKeys.domainDir];
     this.generator = generator as GenModelsGenerator;
+    this.generator.builderFunc = this;
   }
 
   @override
@@ -51,9 +51,19 @@ class GenModelsBuilder extends LibraryBuilder {
     '.dart': ['.mapper.dart'],
   };
 
-  void _onDetectedClassPaths({required GeneratedBuilderFactory data}) {
-    data.prefix = _getImportPrefix;
+  @override
+  void onDetectedClassPaths({required GeneratedBuilderFactory data}) {
     generateBuilderFactory = data;
+  }
+
+  @override
+  bool checkDuplicateClassName(String className) {
+    return classNames.contains(className);
+  }
+
+  @override
+  String getPrefix() {
+    return 'prefix${++_importCount}';
   }
 
   int count = 0;
@@ -63,102 +73,130 @@ class GenModelsBuilder extends LibraryBuilder {
     return GenModelsBuilderOutput(
         imports: _imports.join('\n'),
         funcs: _funcs.join('\n'),
-        path: generateBuilderFactory.path);
+    );
   }
 
   @override
   Future<void> build(BuildStep buildStep) async {
     count++;
-    _imports.clear();
-    _funcs.clear();
+    _imports = [];
+    _funcs = [];
     generateBuilderFactory = GeneratedBuilderFactory();
-    generator.onDetectedClassPaths = _onDetectedClassPaths;
     generator.builderHashCode = hashCode.toString();
+    appLog(['start buildStep.inputId.path',buildStep.inputId.path]);
     final result = await super.build(buildStep);
+    appLog(['end buildStep.inputId.path',buildStep.inputId.path]);
     _generateContent();
-    // await _createdMapperFile(buildStep);
     return result;
   }
 
-  _createdMapperFile(BuildStep buildStep) async {
-    // if(count==0){
-    //   count++;
-    //   return;
-    // }
-    _generateContent();
-    String? content = await _readFile(buildStep: buildStep);
-    content ??= '';
-    String startFile = '''class MapperImports{
-    final data=[''';
-    String endFile = '''
-    ];
-  }
-    ''';
-    if (content.isNotEmpty) {
-      final arrays = content!.split(split);
-      startFile = arrays[0];
-      endFile = arrays[1];
-    }
-    // print('_imports.join:${_imports.join('\n')}');
-    // print('_funcs.join:${_funcs.join('\n')}');
-    startFile = '''${_imports.join('\n')}${startFile}''';
-    endFile = '''${_funcs.join('\n')}${endFile}''';
-    content = '''
-      $startFile
-      $split
-      $endFile
-    ''';
-    // print('content 1:${content}');
-    await _writeFile(content: content, buildStep: buildStep);
-  }
+  // _createdMapperFile(BuildStep buildStep) async {
+  //   // if(count==0){
+  //   //   count++;
+  //   //   return;
+  //   // }
+  //   _generateContent();
+  //   String? content = await _readFile(buildStep: buildStep);
+  //   content ??= '';
+  //   String startFile = '''class MapperImports{
+  //   final data=[''';
+  //   String endFile = '''
+  //   ];
+  // }
+  //   ''';
+  //   if (content.isNotEmpty) {
+  //     final arrays = content!.split(split);
+  //     startFile = arrays[0];
+  //     endFile = arrays[1];
+  //   }
+  //   // print('_imports.join:${_imports.join('\n')}');
+  //   // print('_funcs.join:${_funcs.join('\n')}');
+  //   startFile = '''${_imports.join('\n')}${startFile}''';
+  //   endFile = '''${_funcs.join('\n')}${endFile}''';
+  //   content = '''
+  //     $startFile
+  //     $split
+  //     $endFile
+  //   ''';
+  //   // print('content 1:${content}');
+  //   await _writeFile(content: content, buildStep: buildStep);
+  // }
 
   _generateContent() async {
-    generateBuilderFactory?.objects?.forEach(
+    _imports.addAll(generateBuilderFactory.objectImportInfos
+        .where(
+          (element) => element.import?.isNotEmpty == true,
+    )
+        .map(
+          (e) => '123:{${e.getImportPrefix()}}',
+    )
+        .toList());
+    _imports.addAll(generateBuilderFactory.imports);
+    generateBuilderFactory.objects.forEach(
           (element) {
-        _getText(
-            file: generateBuilderFactory!,
-            obj: element,
-            prefix: generateBuilderFactory!.prefix);
+        if (element.name?.isNotEmpty == true) {
+          String className = element.name ?? '';
+          _funcs.add(
+            '//MapperData(type: "${StringUtils.addPrefixAndSuffix(
+                text: element.prefix,
+                suffix: '.')}${className}", func: ${StringUtils
+                .addPrefixAndSuffix(
+                text: element.mapperPrefix, suffix: '.')}${element
+                .mapperClassName}.fromDTO)',
+          );
+        }
       },
     );
   }
-
-  _getText(
-      {required GeneratedBuilderFactory file,
-        required dynamic obj,
-        String? prefix}) {
-    String className = obj.runtimeType.toString();
-    // print('file.path: ${file.path}');
-    // print(
-    //     'func.path: ${'MapperData(type: "${obj.runtimeType.toString()}", func: ${prefix}.${className}.fromDTO)'}');
-    _imports.add(
-      '//import "${file.path}" as ${prefix};',
-    );
-    _funcs.add(
-      '//MapperData(type: "${obj.runtimeType.toString()}", func: ${prefix}.${className}.fromDTO)',
-    );
-  }
-
-  _writeFile(
-      {String? path, String content = '', required BuildStep buildStep}) async {
-    final outputId = AssetId(buildStep.inputId.package, path ?? filePath);
-    await buildStep.writeAsString(outputId, content);
-  }
-
-  Future<String> _readFile({String? path, required BuildStep buildStep}) async {
-    final inputId = AssetId(buildStep.inputId.package, path ?? filePath);
-    if (await buildStep.canRead(inputId))
-      return await buildStep.readAsString(inputId);
-    return '';
-  }
+//
+// _writeFile(
+//     {String? path, String content = '', required BuildStep buildStep}) async {
+//   final outputId = AssetId(buildStep.inputId.package, path ?? filePath);
+//   await buildStep.writeAsString(outputId, content);
+// }
+//
+// Future<String> _readFile({String? path, required BuildStep buildStep}) async {
+//   final inputId = AssetId(buildStep.inputId.package, path ?? filePath);
+//   if (await buildStep.canRead(inputId))
+//     return await buildStep.readAsString(inputId);
+//   return '';
+// }
 }
 
 class GeneratedBuilderFactory {
-  List? objects;
-  String? path;
+  List<GeneratedBuilderObject> objects;
+  List<ImportInfo> objectImportInfos;
+  List<String> imports;
   String? prefix;
+  String path;
 
-  GeneratedBuilderFactory({this.objects, this.path});
+  GeneratedBuilderFactory({List<GeneratedBuilderObject>? objects,
+    List<ImportInfo>? importInfos,
+    List<String>? imports,
+    String? prefix,
+    String? path,
+    String? mapperClassName,
+    String? mapperPrefix})
+      : objectImportInfos = importInfos ?? [],
+        imports = imports ?? [],
+        path = path ?? '',
+        objects = objects ?? [];
+
+}
+
+class GeneratedBuilderObject {
+  String? name;
+  String? prefix;
+  String mapperClassName;
+  String mapperPrefix;
+
+  GeneratedBuilderObject({this.name,
+    String? prefix,
+    String? mapperClassName,
+    String? mapperPrefix})
+      : prefix = prefix ?? '',
+        mapperClassName = mapperClassName ?? '',
+        mapperPrefix = mapperPrefix ?? '';
 }
 
 class GenModelsBuilderOutput {

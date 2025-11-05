@@ -10,7 +10,7 @@ import '../generator.dart';
 
 Builder genBuilder(BuilderOptions options) {
   final libBuilder = GenModelsBuilder(GenModelsGenerator(options: options),
-      generatedExtension: '.mapper.dart',options: options);
+      generatedExtension: '.mapper.dart', options: options);
 
   // Trả builder "bọc"
   return IndexingBuilder(libBuilder);
@@ -37,20 +37,20 @@ class IndexingBuilder implements Builder {
       indexFile.deleteSync();
     }
     final resutl = await _inner.getBuildOutput(buildStep);
-    if (resutl.imports?.isEmpty == true) return;
+    // if (resutl.imports?.isEmpty == true) return;
     if (indexFile.existsSync() && !isDeleted) {
       indexFile.deleteSync();
     }
     indexFile.createSync(recursive: true);
     String content = '''
-    //__start file__
-    //${resutl.path}
-    ${resutl.imports ?? ''}\n${resutl.funcs ?? ''}\n
+  //__start file__11111
+  //${resutl.path}
+   ${resutl.imports ?? ''}\n${resutl.funcs ?? ''}\n
     ''';
-    if (resutl.imports?.isNotEmpty == true) {
+    if (resutl.imports?.isNotEmpty == true ||
+        resutl.funcs?.isNotEmpty == true) {
       indexFile.writeAsStringSync(content, mode: FileMode.append);
     }
     isDeleted = true;
   }
 }
-

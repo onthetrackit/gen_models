@@ -1,4 +1,5 @@
 import 'package:analyzer/dart/element/element.dart';
+import 'package:gen_models/models/inport_info.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
@@ -29,6 +30,18 @@ class StringUtils {
     return '${className}Mapper';
   }
 
+  static String addPrefixAndSuffix(
+      {String? text, String? prefix, String? suffix}) {
+    if (text?.isNotEmpty == true) {
+      return '${prefix ?? ''}${text}${suffix ?? ''}';
+    }
+    return '';
+  }
+
+  static String getDTOMapperClassName(String className) {
+    return '${className}DTO';
+  }
+
   static String getDTOClass(String className) {
     return '${className}DTO';
   }
@@ -55,17 +68,45 @@ class StringUtils {
     return path;
   }
 
-  static String getCurrentPackage({Element? element}) {
+  static String getPackage({Element? element}) {
     String path = element?.location?.components
             .where(
               (element) => element.isNotEmpty == true,
             )
             .firstOrNull ??
         '';
-    if(path.isNotEmpty==true){
-      return path.substring(path.indexOf(':')+1,path.indexOf('/'));
+    if (path.isNotEmpty == true) {
+      return path.substring(path.indexOf(':') + 1, path.indexOf('/'));
     }
     return '';
+  }
+
+  static ImportInfo getInportInfo({Element? element}) {
+    ImportInfo importInfo = ImportInfo();
+    String path = element?.location?.components
+            .where(
+              (element) => element.isNotEmpty == true,
+            )
+            .firstOrNull ??
+        '';
+    if (path.isNotEmpty == true) {
+      int index = path.indexOf('/');
+      importInfo.package =
+          path.substring(path.indexOf(':') + 1, path.indexOf('/'));
+      importInfo.dirPath = path.substring(index + 1);
+      importInfo.fileName = path.substring(path.lastIndexOf('/') + 1);
+      importInfo.import = path;
+    }
+    return importInfo;
+  }
+
+  static String getMapperPath(String path) {
+    print('getMapperPath:${path}====${path.replaceAll(RegExp('.dart\$'), '.mapper.dart')}');
+    return path.replaceAll(RegExp(r'.dart$'), '.mapper.dart');
+  }
+
+  static String getImportForElement({Element? element, String? path}) {
+    return "import '${path ?? StringUtils.getPath(element)}';";
   }
 
   static String getDTOPath(
@@ -100,5 +141,14 @@ class StringUtils {
       }
     }
     return StringUtils.addDtoToFilePath(path);
+  }
+}
+appLog(List params,{String? prefix,String? suffix}){
+  if(prefix?.isNotEmpty==true){
+    print(prefix);
+  }
+  print(params.map((e) => e.toString(),).join(','));
+  if(suffix?.isNotEmpty==true){
+    print(suffix);
   }
 }
