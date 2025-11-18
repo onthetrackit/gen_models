@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
 
@@ -7,6 +8,7 @@ import 'package:build/build.dart';
 import 'package:gen_models/annotations.dart';
 import 'package:gen_models/builder/builder_funcs.dart';
 import 'package:gen_models/constants/app_values.dart';
+import 'package:gen_models/generator.dart';
 import 'package:gen_models/models/inport_info.dart';
 import 'package:gen_models/string_utils.dart';
 import 'package:source_gen/source_gen.dart';
@@ -14,8 +16,9 @@ import 'package:collection/collection.dart';
 import 'builder/gen_models_builder.dart';
 import 'builder/import_info_manager.dart';
 import 'constants/build_option_keys.dart';
+import 'models/mapper_type_info.dart';
 
-class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> {
+class GenModelsRepositoryGenerator extends GenModelsGenerator<GenModels> {
   late BuilderFunc builderFunc;
   String? builderHashCode;
 
@@ -32,7 +35,7 @@ class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> 
   late Map<String, GeneratedBuilderFactory> mapGenerateBuilderFactory;
   Set<String> pathBuilded = Set();
 
-  GenModelsGenerator({this.options}) {
+  GenModelsRepositoryGenerator({this.options}) {
     dataDir ??= options?.config[BuildOptionKeys.dataDir];
     domainDir ??= options?.config[BuildOptionKeys.domainDir];
   }
@@ -41,8 +44,14 @@ class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> 
       mapGenerateBuilderFactory['lib/${path}'];
 
   @override
+  Future<String> generate(LibraryReader library, BuildStep buildStep) async {
+    return await super.generate(library, buildStep);
+  }
+
+  @override
   Future<String?> generateForAnnotatedElement(
       Element element, ConstantReader annotation, BuildStep buildStep) async {
+    StringBuffer sb = StringBuffer();
     ImportInfo currentImportInfo = StringUtils.getImportInfo(element: element);
     if (!StringUtils.checkFileName(currentImportInfo.dirPath ?? '')) return '';
     currentImportInfo.prefix ??= builderFunc.getPrefix();
@@ -77,18 +86,22 @@ class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> 
     final classes = _getBody(element as ClassElement, element.library,
         annotation, currentGeneratedBuilderFactory);
     List<String> bodies = [];
+    List<String> mappers = [];
     imports.addAll(classes.imports);
     bodies.add(classes.body);
     imports = imports.toSet().toList();
     imports.sort();
+    sb.writeln(currentGeneratedBuilderFactory.mappers.join('\n'));
+    mappers.addAll(currentGeneratedBuilderFactory.mappers);
     currentGeneratedBuilderFactory.bodies.addAll(bodies);
     ImportInfoManager.instance.addAllImportInfo(imports
         .map(
           (e) => ImportInfo(import: e),
         )
         .toList());
-    builderFunc.onDetectedClassPaths(data: currentGeneratedBuilderFactory);
-    return '';
+    sb.write(currentGeneratedBuilderFactory.mappers.join('\n'));
+    // builderFunc.onDetectedClassPaths(data: currentGeneratedBuilderFactory);
+    return sb.toString();
   }
 
   ClassResult _getBody(
@@ -97,74 +110,87 @@ class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> 
     ConstantReader annotation,
     GeneratedBuilderFactory generatedBuilderFactory,
   ) {
-    // final currentReader = LibraryReader(currentLibrary);
-    // final targetReader = LibraryReader(targetLibrary);
-    // HashMap<String, ClassElement> currentClasses =
-    //     _getMapElements(currentReader.classes);
-    // HashMap<String, ClassElement> targetClasses =
-    //     _getMapElements(targetReader.classes);
-    // List<ClassResult> results = [];
-    // currentReader.classes.forEach((cls) {
-
-    ImportInfo fileInportInfo = StringUtils.getImportInfo(element: cls);
-    final generatedBuilderObject = GeneratedBuilderObject(
-        name: cls.name,
-        mapperClassName: StringUtils.getMapperClassName(cls.name));
-    generatedBuilderFactory.objects.add(generatedBuilderObject);
-    generatedBuilderObject.importInfo = ImportInfoManager.instance.getInfoFor(
-      builderFunc: builderFunc,
-      name: cls.name,
-      defaultImportInfo: fileInportInfo,
-    );
-    generatedBuilderObject.mapperImportInfo =
-        ImportInfoManager.instance.getInfoFor(
-      builderFunc: builderFunc,
-      name: generatedBuilderObject.mapperClassName,
-      defaultImportInfo: fileInportInfo.cloneToMapper(),
-    );
     return _getClassResult(cls, null, generatedBuilderFactory);
   }
 
   ClassResult _getClassResult(ClassElement cls, ClassElement? targetClass,
       GeneratedBuilderFactory generatedBuilderFactory) {
     StringBuffer sb = StringBuffer();
-    final dtoClass = StringUtils.getDTOClass(cls.name);
-    final mapperClass = StringUtils.getMapperClassName(cls.name);
-    final domainClass = '${cls.name}';
-    sb.writeln('class ${mapperClass}{');
-    sb.writeln('  static ${domainClass}? $fromDTO($dtoClass? ${dtoObject}){');
-    sb.writeln('  if(${dtoObject}==null) return null;');
-    sb.writeln('  ${domainClass} ${newObj} = $domainClass();');
     List<String> imports = [];
-    HashMap<String, FieldElement> currentFields = _getMapElements(cls.fields);
-    // HashMap<String, FieldElement> targetFields =
-    //     _getMapElements(targetClass.fields);
-    // Set<String> targetKeys = Set.from(targetFields.keys);
-    // currentFields.removeWhere((key, value) => !targetKeys.contains(key));
-    currentFields.forEach((key, field) {
-      final result = _getFieldDeclare(field, generatedBuilderFactory);
-      if (result != null) {
-        imports.addAll(result.imports);
-        sb.writeln(result.body);
+    List<String> mappers = [];
+    cls.methods.forEach((method) {
+      print('method name ${method.name}-type ${method.returnType.toString()}');
+      if (true ||method.returnType is! InvalidType) {
+        if (!StringUtils.checkNativeType(
+            method.returnType.element?.name ?? '')) {
+          final resultType = _getReturnType(method.returnType);
+          if (method.returnType.isDartCoreList ||
+              method.returnType is InterfaceType) {
+            generatedBuilderFactory.mappers.add(
+                '${method.name}-MapType<${resultType.mapTypes}>(ignoreFieldNull: true)');
+          } else if (method.returnType.isDartCoreMap) {
+            final result = _getClassTextForList(
+                type: method.returnType as InterfaceType,
+                varName: '',
+                generatedBuilderFactory: generatedBuilderFactory);
+            //MapType<Parent<Child>, ParentDTO<ChildDTO>>(ignoreFieldNull: true),
+            generatedBuilderFactory.mappers
+                .add(StringUtils.getMapTypeText(result?.mappers));
+          } else {
+            generatedBuilderFactory.mappers.add(
+                '//${method.name}-${method.runtimeType.toString()}-${method.returnType.runtimeType.toString()}:' +
+                    StringUtils.getMapTypeText(
+                        [method.returnType.element?.name ?? '']));
+          }
+          // generatedBuilderFactory.mappers.add(method.returnType.getDisplayString(withNullability: true));
+        }
       }
     });
-    sb.writeln('  return ${newObj};');
-    sb.writeln('  }\n\t}');
-    return ClassResult(body: sb.toString(), imports: imports);
+    return ClassResult(body: sb.toString(), imports: imports, mappers: mappers);
   }
 
-  HashMap<String, T> _getMapElements<T extends Element>(Iterable<T> elements) {
-    HashMap<String, T> result = HashMap();
-    (elements)
-        .where(
-      (element) => !element.isSynthetic,
-    )
-        .forEach(
-      (element) {
-        result[element.name ?? ''] = element;
-      },
-    );
-    return result;
+  MapperTypeInfo _getReturnType(DartType type) {
+    MapperTypeInfo mapperTypeInfo = MapperTypeInfo();
+    final name = type.element?.name ?? '';
+    mapperTypeInfo.addSingleType(name);
+    StringBuffer sb = StringBuffer();
+    sb.write(name);
+    if (!StringUtils.checkNativeType(name)) {
+      if (type is InterfaceType) {
+        List<String> childTypes = [];
+        List<String> childTypesDTO = [];
+        // print("type.typeArguments"+type.typeArguments.length.toString());
+        type.typeArguments.forEach((e) {
+          final name = e.element!.name ?? '';
+          mapperTypeInfo.addSingleType(name);
+          if (!StringUtils.checkNativeType(name)) {
+            final resultMapper = _getReturnType(e);
+            childTypes.add('${resultMapper.mapTypes}');
+            mapperTypeInfo.addAllSingleType(resultMapper.singleTypes);
+          }else {
+            childTypes.add(name);
+          }
+        });
+        // print("childTypes"+childTypes.length.toString()+"kq:  ${childTypes.join('---')}");
+        if(type.typeArguments.length>0) {
+          sb.write('<${childTypes.join(', ')}>');
+        }else{
+          sb.write('${childTypes.join(', ')}');
+        }
+      }
+    }
+
+    mapperTypeInfo.mapTypes = sb.toString();
+    appLog([
+      'mapperTypeInfo.mapTypes',
+      mapperTypeInfo.mapTypes,
+      mapperTypeInfo.singleTypes.join('\n')
+    ]);
+    final isAllNative = mapperTypeInfo.singleTypes.isEmpty;
+    if (isAllNative) {
+      mapperTypeInfo.mapTypes = '';
+    }
+    return mapperTypeInfo;
   }
 
   ClassResult? _getFieldDeclare(
@@ -175,14 +201,16 @@ class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> 
           type: field.type as InterfaceType,
           varName: field.name,
           generatedBuilderFactory: generatedBuilderFactory);
-      if (result?.body.isNotEmpty == true) {
-        result?.body += ';';
-      }
+      //MapType<Parent<Child>, ParentDTO<ChildDTO>>(ignoreFieldNull: true),
+      generatedBuilderFactory.mappers
+          .add(StringUtils.getMapTypeText(result?.mappers));
     } else if (field.type.element != null) {
       result = _getClassResultForNotIterator(
           field: field.type.element!,
           varName: field.name,
           generatedBuilderFactory: generatedBuilderFactory);
+      generatedBuilderFactory.mappers
+          .add(StringUtils.getMapTypeText(result.mappers));
     }
     return result;
   }
@@ -196,16 +224,9 @@ class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> 
     ClassResult result = ClassResult();
     final name = field.name ?? '';
     final isGenModels = (isGenModelsClass(field));
-    if (AppValues.nativeTypes.contains(name) || !isGenModels) {
-      result.body = '   ${newObj}.${varName} = ${dtoObject}.${varName};';
-    } else {
+    if (!AppValues.nativeTypes.contains(name)) {
       result.body =
           '    ${newObj}.${varName} = ${_getClassNameFromType(field.name)}Mapper.$fromDTO(${dtoObject}.${varName});';
-      generatedBuilderFactory.objects
-          .add(ImportInfoManager.instance.getGeneratedBuilderObjectFromImport(
-        importText: StringUtils.getImportInfo(element: field).import!,
-        name: name,
-      ));
     }
     return result;
   }
@@ -225,13 +246,9 @@ class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> 
             '${_getClassNameFromType(field.name)}Mapper.$fromDTO(${varName})!';
         // result.imports.add(StringUtils.getImportForElement(element: field)
         //     .replaceAll('.dart', '.mapper.dart'));
-        generatedBuilderFactory.objects
-            .add(ImportInfoManager.instance.getGeneratedBuilderObjectFromImport(
-          importText: StringUtils.getImportInfo(element: field).import!,
-          name: name,
-        ));
       }
     }
+    result.mappers.add(field.name ?? '');
     return result;
   }
 
@@ -244,12 +261,8 @@ class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> 
     StringBuffer mapperStringBuffer = StringBuffer();
     final first = type.typeArguments.firstOrNull;
     ClassResult? result = ClassResult();
+    List<String> mappers = [];
     if (first == null) {
-      generatedBuilderFactory.objects
-          .add(ImportInfoManager.instance.getGeneratedBuilderObjectFromImport(
-        importText: StringUtils.getImportInfo(element: type.element).import!,
-        name: type.element.name,
-      ));
       return _getClassResultForIterator(
           field: type.element,
           varName: 'element',
@@ -267,9 +280,9 @@ class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> 
           generatedBuilderFactory: generatedBuilderFactory);
     }
     if (result != null) {
-      sb.writeln(
-          '''${obj?.isNotEmpty == true ? '' : '${newObj}.${varName}='}${obj != null ? obj : '${dtoObject}.${obj ?? varName}'}?.map((element)=>${result.body}).toList()??[]''');
-      return ClassResult(body: sb.toString(), imports: result.imports);
+      mappers.add(first.element!.name!);
+      return ClassResult(
+          body: sb.toString(), imports: result.imports, mappers: mappers);
     }
     return null;
   }
@@ -302,7 +315,7 @@ class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> 
     return type ?? '';
   }
 
-  bool isGenModelsClass(Element element) {
+  bool isGenModelsRepositoryClass(Element element) {
     return element.metadata.firstWhereOrNull(
             (element) => element.toString().contains('@GenModels')) !=
         null;
@@ -312,13 +325,14 @@ class GenModelsGenerator<T extends GenModels> extends GeneratorForAnnotation<T> 
 class ClassResult {
   List<String> imports;
   String body;
-  String? mapper;
+  List<String> mappers;
   GeneratedBuilderObject? generatedBuilderObject;
 
   ClassResult(
       {List<String>? imports,
       this.body = '',
       this.generatedBuilderObject,
-      this.mapper})
-      : imports = imports ?? [];
+      List<String>? mappers})
+      : imports = imports ?? [],
+        mappers = mappers ?? [];
 }

@@ -7,4 +7,16 @@ class AppValues {
     'double',
     'dynamic'
   };
+  static const Set<String> nativeCoreType = {
+    'int',
+    'String',
+    'bool',
+    'double',
+    'dynamic',
+    'Map',
+    'Set',
+    'List',
+    'Iterator',
+    'Iterable',
+  };
 }

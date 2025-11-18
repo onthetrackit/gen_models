@@ -7,11 +7,12 @@ import 'package:gen_models/mapper_factory.dart';
 import 'package:gen_models/string_utils.dart';
 import 'package:source_gen/source_gen.dart';
 
+import '../repository_generator.dart';
 import 'gen_models_builder.dart';
 import '../generator.dart';
 
 Builder genBuilder(BuilderOptions options) {
-  final libBuilder = GenModelsBuilder(GenModelsGenerator(options: options),
+  final libBuilder = GenModelsBuilder(GenModelsRepositoryGenerator(options: options),
       generatedExtension: '.mapper.dart', options: options);
 
   // Trả builder "bọc"

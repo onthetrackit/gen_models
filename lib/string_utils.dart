@@ -151,6 +151,35 @@ class StringUtils {
     }
     return StringUtils.addDtoToFilePath(path);
   }
+
+  static bool checkNativeType(String? type) {
+    if (type?.isNotEmpty != true) {
+      return false;
+    }
+    return AppValues.nativeTypes.contains(type);
+  }
+  static bool checkCoreType(String? type) {
+    if (type?.isNotEmpty != true) {
+      return false;
+    }
+    return AppValues.nativeCoreType.contains(type);
+  }
+
+  //MapType<Parent<Child>, ParentDTO<ChildDTO>>(ignoreFieldNull: true),
+  static String getMapTypeText(List<String>? classes) {
+    if (classes?.isNotEmpty != true) return '';
+    StringBuffer sb = StringBuffer();
+    StringBuffer targetStringBuffer = StringBuffer();
+    for (int i = 0; i < classes!.length - 1; i++) {
+      final cls = classes[i];
+      sb.write('<${cls}>');
+      targetStringBuffer.write('<${cls}DTO>');
+    }
+    final last = classes.lastOrNull;
+    if (last?.isNotEmpty == true) sb.write('${last}');
+    if (last?.isNotEmpty == true) targetStringBuffer.write('${last}DTO');
+    return 'MapType<${sb.toString()}, ${targetStringBuffer.toString()}>(ignoreFieldNull: true),';
+  }
 }
 
 appLog(List params, {String? prefix, String? suffix}) {
